@@ -1,123 +1,46 @@
 [BITS 16]
-[ORG 0x7C00]
+[ORG 0x7C00] ;telling the assembler that the code will be loaded at 0x7C00
 
 start:
-    cli ; Disable interrupts short for clear interrupts flag
+    cli
     xor ax,ax
     mov ds,ax
     mov es,ax
     mov ss,ax
     mov sp,0x7C00
-    sti ; Enable interrupts short for set interrupts flag
+    sti
 
-    mov [DriveId],dl   ; Store the drive number for later use
-    ; Jump to the code that checks for INT13h extensions and loads the next stage
-    ; 80 for hard disk, 00 for floppy disk
+    mov [DriveId],dl
 
-
-
-;-----------------------------
-; Check INT13h Extensions
-;-----------------------------
-    ; Check if the BIOS supports INT13h extensions, which allow for LBA access and larger disk sizes.
-    mov ah,0x41 ; Check Extensions
-    mov bx,0x55AA;signature for BIOS  
+; --- INT13拡張チェック ---
+    mov ah,0x41
+    mov bx,0x55AA
     int 0x13
-    jc NotSupport; Carry flag(CF) set means not support
+    jc fail
     cmp bx,0xAA55
-    jne NotSupport
+    jne fail
 
-LoadLoader:
-
-    mov si,ReadPacket
-
-    mov byte  [si],16       ; packet size
-    mov byte  [si+1],0      ; reserved
-    mov word  [si+2],5      ; sectors to read
-    mov word  [si+4],0x7e00 ; offset
-    mov word  [si+6],0x0000 ; segment
-    mov dword [si+8],1      ; LBA low
-    mov dword [si+12],0     ; LBA high
+; --- loader読み込み（LBA=1）---
+    mov si,Packet
+    mov byte [si],16
+    mov word [si+2],5
+    mov word [si+4],0x7E00
+    mov word [si+6],0x0000
+    mov dword [si+8],1
 
     mov ah,0x42
     mov dl,[DriveId]
     int 0x13
-    jc ReadError
+    jc fail
 
-    jmp 0x0000:0x7e00
+    jmp 0x0000:0x7E00
 
-;-----------------------------
-; Print success message
-;-----------------------------
-
-PrintMessage:
-
-    mov ax,cs
-    mov ds,ax
-    mov es,ax
-
-    mov si,Message
-
-PrintLoop:
-    lodsb
-    cmp al,0
-    je End
-
-    mov ah,0x0E
-    int 0x10
-    jmp PrintLoop
-
-
-ReadError:
-NotSupport:
-
-    mov ax,cs
-    mov ds,ax
-    mov es,ax
-
-    mov si,FailMsg
-
-FailLoop:
-    lodsb
-    cmp al,0
-    je End
-
-    mov ah,0x0E
-    int 0x10
-    jmp FailLoop
-
-End:
-    cli
+fail:
     hlt
-    jmp End
-
-;-----------------------------
-; Data
-;-----------------------------
+    jmp fail
 
 DriveId db 0
+Packet times 16 db 0
 
-Message db "Disk extension is supported",0
-FailMsg db "We have a read error",0
-ReadPacket times 16 db 0
-
-;-----------------------------
-; Partition Table
-;-----------------------------
-
-times (0x1BE-($-$$)) db 0
-
-    db 0x80
-    db 0x00,0x02,0x00
-    db 0xF0
-    db 0xFF,0xFF,0xFF
-    dd 1
-    dd 2048
-
-times (16*3) db 0
-
-;-----------------------------
-; Boot Signature
-;-----------------------------
-
+times 510-($-$$) db 0
 dw 0xAA55
