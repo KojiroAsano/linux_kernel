@@ -52,9 +52,11 @@ start:
 fail:
     hlt
     jmp fail
+;
+;; --- ここまでloader.asm ---
 
 DriveId db 0
 Packet times 16 db 0
 
 times 510-($-$$) db 0
-dw 0xAA55
+dw 0xAA55; boot signature the last two bytes of the 512-byte sector must be 0x55 and 0xAA for the BIOS to recognize it as a valid boot sector
