@@ -4,22 +4,16 @@
 start:
     mov rdi,Idt
     mov rax,Handler0
-
-    mov [rdi],ax
-    shr rax,16
-    mov [rdi+6],ax
-    shr rax,16
-    mov [rdi+8],eax
+    call SetHandler
 
     mov rax,Timer
-    add rdi,32*16
-    mov [rdi],ax
-    shr rax,16
-    mov [rdi+6],ax
-    shr rax,16
-    mov [rdi+8],eax
+    mov rdi,Idt+32*16
+    call SetHandler
 
-
+    mov rdi,Idt+32*16+7*16
+    mov rax,SIRQ
+    call SetHandler
+    
     lgdt [Gdt64Ptr]
     lidt [IdtPtr]
 
@@ -32,10 +26,8 @@ SetTss:
     mov [TssDesc+7],al
     shr rax,8
     mov [TssDesc+8],eax
-
     mov ax,0x20
     ltr ax
-
 
     push 8
     push KernelEntry
@@ -79,8 +71,6 @@ InitPIC:
     mov al,11111111b
     out 0xa1,al
 
-    ;sti
-
     push 0x18|3
     push 0x7c00
     push 0x202
@@ -92,17 +82,18 @@ End:
     hlt
     jmp End
 
+SetHandler:
+    mov [rdi],ax
+    shr rax,16
+    mov [rdi+6],ax
+    shr rax,16
+    mov [rdi+8],eax
+    ret
+
 UserEntry:
-    mov ax,cs
-    and al,11b
-    cmp al,3
-    jne UEnd
-
-    mov byte[0xb8010],'U'
-    mov byte[0xb8011],0xE
-
-UEnd:
-    jmp UEnd
+    inc byte[0xb8010]
+    mov byte[0xb8011],0xF
+    jmp UserEntry
 
 Handler0:
     push rax
@@ -161,11 +152,12 @@ Timer:
     push r14
     push r15
 
-    mov byte[0xb8020],'T'
+    inc byte[0xb8020]
     mov byte[0xb8021],0xe
-    jmp End
+    
+    mov al,0x20
+    out 0x20,al
    
-
     pop	r15
     pop	r14
     pop	r13
@@ -183,6 +175,53 @@ Timer:
     pop	rax
 
     iretq
+
+SIRQ:
+    push rax
+    push rbx  
+    push rcx
+    push rdx  	  
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+
+    mov al,11
+    out 0x20,al
+    in al,0x20
+
+    test al,(1<<7)
+    jz .end
+
+    mov al,0x20
+    out 0x20,al
+
+.end:
+    pop	r15
+    pop	r14
+    pop	r13
+    pop	r12
+    pop	r11
+    pop	r10
+    pop	r9
+    pop	r8
+    pop	rbp
+    pop	rdi
+    pop	rsi  
+    pop	rdx
+    pop	rcx
+    pop	rbx
+    pop	rax
+
+    iretq
+
 
 Gdt64:
     dq 0
