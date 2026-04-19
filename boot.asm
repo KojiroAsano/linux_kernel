@@ -1,123 +1,79 @@
 [BITS 16]
-[ORG 0x7C00]
+[ORG 0x7c00]
 
 start:
-    cli ; Disable interrupts short for clear interrupts flag
-    xor ax,ax
-    mov ds,ax
-    mov es,ax
-    mov ss,ax
-    mov sp,0x7C00
-    sti ; Enable interrupts short for set interrupts flag
+    mov ah, 0x0e
+    mov al, 'B'
+    int 0x10
 
-    mov [DriveId],dl   ; Store the drive number for later use
-    ; Jump to the code that checks for INT13h extensions and loads the next stage
-    ; 80 for hard disk, 00 for floppy disk
+    
+    cli
+    xor ax, ax
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+    mov sp, 0x7c00
+    sti
 
+    mov [DriveId], dl
 
-
-;-----------------------------
-; Check INT13h Extensions
-;-----------------------------
-    ; Check if the BIOS supports INT13h extensions, which allow for LBA access and larger disk sizes.
-    mov ah,0x41 ; Check Extensions
-    mov bx,0x55AA;signature for BIOS  
+; --- 拡張INT13チェック ---
+    mov ah, 0x41
+    mov bx, 0x55aa
     int 0x13
-    jc NotSupport; Carry flag(CF) set means not support
-    cmp bx,0xAA55
-    jne NotSupport
+    jc disk_error
+    cmp bx, 0xaa55
+    jne disk_error
 
-LoadLoader:
+; --- loader 読み込み ---
+    mov si, dap
+    mov word [si], 0x10        ; size
+    mov word [si+2], 5         ; 1 sector
+    mov word [si+4], 0x7e00    ; offset
+    mov word [si+6], 0x0000    ; segment
+    mov dword [si+8], 1        ; LBA = 1
+    mov dword [si+12], 0
 
-    mov si,ReadPacket
-
-    mov byte  [si],16       ; packet size
-    mov byte  [si+1],0      ; reserved
-    mov word  [si+2],5      ; sectors to read
-    mov word  [si+4],0x7e00 ; offset
-    mov word  [si+6],0x0000 ; segment
-    mov dword [si+8],1      ; LBA low
-    mov dword [si+12],0     ; LBA high
-
-    mov ah,0x42
-    mov dl,[DriveId]
+    mov dl, [DriveId]
+    mov ah, 0x42
     int 0x13
-    jc ReadError
+    jc disk_error
 
+; --- loaderへ ---
+    mov dl, [DriveId]
     jmp 0x0000:0x7e00
 
-;-----------------------------
-; Print success message
-;-----------------------------
-
-PrintMessage:
-
-    mov ax,cs
-    mov ds,ax
-    mov es,ax
-
-    mov si,Message
-
-PrintLoop:
-    lodsb
-    cmp al,0
-    je End
-
-    mov ah,0x0E
+disk_error:
+    mov ah,0x13
+    mov al,1
+    mov bx,0xa
+    xor dx,dx
+    mov bp,Message
+    mov cx,MessageLen 
     int 0x10
-    jmp PrintLoop
 
-
-ReadError:
-NotSupport:
-
-    mov ax,cs
-    mov ds,ax
-    mov es,ax
-
-    mov si,FailMsg
-
-FailLoop:
-    lodsb
-    cmp al,0
-    je End
-
-    mov ah,0x0E
-    int 0x10
-    jmp FailLoop
-
-End:
-    cli
+hang:
     hlt
-    jmp End
-
-;-----------------------------
-; Data
-;-----------------------------
+    jmp hang
 
 DriveId db 0
+dap times 16 db 0
+Message:    db "We have an error in boot process"
+MessageLen: equ $-Message
 
-Message db "Disk extension is supported",0
-FailMsg db "We have a read error",0
-ReadPacket times 16 db 0
+times (0x1be-($-$$)) db 0
 
-;-----------------------------
-; Partition Table
-;-----------------------------
-
-times (0x1BE-($-$$)) db 0
-
-    db 0x80
-    db 0x00,0x02,0x00
-    db 0xF0
-    db 0xFF,0xFF,0xFF
+    db 80h
+    db 0,2,0
+    db 0f0h
+    db 0ffh,0ffh,0ffh
     dd 1
-    dd 2048
+    dd (20*16*63-1)
+	
+    times (16*3) db 0
 
-times (16*3) db 0
+    db 0x55
+    db 0xaa
 
-;-----------------------------
-; Boot Signature
-;-----------------------------
-
-dw 0xAA55
+; times 510-($-$$) db 0
+; dw 0xAA55
