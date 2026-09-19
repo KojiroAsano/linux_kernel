@@ -24,7 +24,10 @@ objcopy -O binary kernel kernel.bin
 
 
 rm -f boot.img
-dd if=/dev/zero of=boot.img bs=512 count=100
+# boot(1) + loader(5) + kernel(KERNEL_SECTORS=100) = 106セクタ必要。
+# 少し余裕を持たせて110セクタ確保する(足りないとカーネル読み込みのINT13hが
+# ディスク終端を超えてエラーになる)。
+dd if=/dev/zero of=boot.img bs=512 count=110
 
 dd if=boot.bin of=boot.img bs=512 count=1 conv=notrunc
 dd if=loader.bin of=boot.img bs=512 seek=1 conv=notrunc

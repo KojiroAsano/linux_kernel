@@ -1,7 +1,7 @@
 [BITS 16]
 [ORG 0x7e00]
 
-%define KERNEL_SECTORS 90   ; kernel.binの実サイズが変わったらここだけ調整する
+%define KERNEL_SECTORS 100  ; kernel.binの実サイズが変わったらここだけ調整する
 
 start:
     cli
@@ -99,13 +99,11 @@ TestA20:
     cmp word[es:0x7c10],0xb200
     jne SetA20LineDone
 
-    ; A20が無効 → fast A20ゲート(ポート0x92)で有効化
     in al, 0x92
     or al, 2
     and al, 0xfe        ; bit0(高速リセット)は誤って立てない
     out 0x92, al
 
-    ; 有効化後に再検証
     mov word[0x7c00],0xd200
     cmp word[es:0x7c10],0xd200
     je A20Error
