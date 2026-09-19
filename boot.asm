@@ -61,7 +61,8 @@ dap times 16 db 0
 Message:    db "We have an error in boot process"
 MessageLen: equ $-Message
 
-times (0x1be-($-$$)) db 0
+; fille up with 0 until 0x1be
+times (0x1be-($-$$)) db 0 
 
     db 80h
     db 0,2,0
