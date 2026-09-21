@@ -1,7 +1,9 @@
 [BITS 16]
 [ORG 0x7e00]
 
-%define KERNEL_SECTORS 100  ; kernel.binの実サイズが変わったらここだけ調整する
+%ifndef KERNEL_SECTORS
+%define KERNEL_SECTORS 100  ; build.shから-Dで渡されなかった場合のフォールバック値
+%endif
 
 start:
     cli
@@ -26,10 +28,13 @@ start:
     cpuid
     test edx, (1<<29)      ; LMビット（ロングモード対応）
     jz NoLongMode
-    ; 注: Page1GBビット(bit26)はあえてチェックしない。
-    ; QEMUの -cpu qemu64 はロングモード対応と申告する一方でPage1GB非対応と
-    ; 申告するが、実際にはPS=1のPDPTEを問題なく処理できる。ここでbit26を
-    ; 弾くと、この環境では常にNoLongMode側に落ちてしまう(実際に踏んだハング)。
+    test edx, (1<<26)      ; Page1GBビット（下のブートストラップ用ページテーブルが使用）
+    jz NoLongMode
+    ; 注: QEMUの-cpu qemu64はデフォルトではPage1GB非対応と申告するため、
+    ; build.shのqemu起動オプションに+pdpe1gbを付けて申告を実態(1GBページの
+    ; PDPTEを問題なく処理できる)に合わせてある。このチェックを有効にしたまま
+    ; QEMUで動かす場合は+pdpe1gbを外さないこと。実機やこのフラグ無しの環境で
+    ; 本当に1GBページ非対応のCPUに当たった場合は、ここで正しく検出して止まる。
 
     jmp skip_ext
 

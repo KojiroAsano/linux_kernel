@@ -1,6 +1,10 @@
 [BITS 16]
 [ORG 0x7c00]
 
+%ifndef TOTAL_SECTORS
+%define TOTAL_SECTORS 110   ; build.shから-Dで渡されなかった場合のフォールバック値
+%endif
+
 start:
     mov ah, 0x0e
     mov al, 'B'
@@ -28,7 +32,7 @@ start:
 ; --- loader 読み込み ---
     mov si, dap
     mov word [si], 0x10        ; size
-    mov word [si+2], 5         ; 1 sector
+    mov word [si+2], 5         ; loader.bin用に5セクタ確保
     mov word [si+4], 0x7e00    ; offset
     mov word [si+6], 0x0000    ; segment
     mov dword [si+8], 1        ; LBA = 1
@@ -69,8 +73,10 @@ times (0x1be-($-$$)) db 0
     db 0f0h
     db 0ffh,0ffh,0ffh
     dd 1
-    dd (20*16*63-1)
-	
+    dd (TOTAL_SECTORS-1)  ; このパーティションテーブル自体は自前のブートローダーは
+                          ; 読まないので実行には影響しないが、値だけは実際のディスク
+                          ; サイズ(TOTAL_SECTORS)に合わせておく
+
     times (16*3) db 0
 
     db 0x55

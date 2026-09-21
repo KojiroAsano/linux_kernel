@@ -68,5 +68,7 @@ void init_idt(void);
 void eoi(void);
 void load_idt(struct IdtPtr *ptr);
 unsigned char read_isr(void);
+void enable_interrupts(void);
+void disable_interrupts(void);
 
 #endif
