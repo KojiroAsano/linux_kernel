@@ -39,14 +39,14 @@ start:
     mov es, ax
     mov ss, ax
     mov sp, 0x7c00
-    sti; enable interrupt for keyboard
+    sti  ; 割り込みを許可に戻す
     mov [DriveId],dl   ; boot.asmから引き継いだドライブ番号を保存
 
     ; 進捗確認用に'L'(Loader)を表示。boot.asmの'B'に続いてここまで
     ; 来たことが分かる。
-    mov ah, 0x0e
-    mov al, 'L'
-    int 0x10
+    mov ah, 0x0e    ; AH=0x0e: テレタイプ出力機能番号
+    mov al, 'L'     ; AL=表示する文字
+    int 0x10        ; BIOS呼び出し→'L'が画面に出る
 
     ; ========================================================================
     ; ステップ1: CPUIDでロングモード対応を確認する
@@ -54,15 +54,15 @@ start:
     ; CPUID命令は、EAXに「知りたい情報の種類(リーフ番号)」を入れて呼ぶと、
     ; EAX/EBX/ECX/EDXにその情報が返ってくる、CPUの機能を調べるための命令。
     ; まず0x80000000を渡して「拡張リーフはいくつまで使えるか」を聞く。
-    mov eax, 0x80000000
-    cpuid
-    cmp eax, 0x80000001
+    mov eax, 0x80000000  ; EAX=0x80000000: 「拡張リーフはいくつまで使えるか」を聞く準備
+    cpuid                 ; 呼び出す→EAXに「対応している最大の拡張リーフ番号」が返る
+    cmp eax, 0x80000001    ; 0x80000001(機能フラグ取得用のリーフ)に対応しているか確認
     jb NoLongMode   ; 0x80000001未満しか対応していないなら、この先で聞きたい
                     ; 「ロングモード対応か」という情報自体が取得できない
 
     ; 0x80000001を渡すと、EDXの各ビットに拡張機能の対応状況が入って返る。
-    mov eax, 0x80000001
-    cpuid
+    mov eax, 0x80000001  ; EAX=0x80000001: 拡張機能フラグを聞く
+    cpuid                 ; 呼び出す→EDXの各bitに対応状況が入って返る
     test edx, (1<<29)      ; LMビット（ロングモード対応）
     jz NoLongMode
     test edx, (1<<26)      ; Page1GBビット（下のブートストラップ用ページテーブルが使用）
@@ -79,9 +79,9 @@ NoLongMode:
     ; ロングモードか1GBページのどちらかに非対応だった場合はここに来る。
     ; 'X'を表示して、これ以上進めないことを画面で分かるようにしてから、
     ; 下のNotSupport(エラー処理・停止ループ)へ合流する。
-    mov ah, 0x0e
-    mov al, 'X'
-    int 0x10
+    mov ah, 0x0e    ; AH=0x0e: テレタイプ出力機能番号
+    mov al, 'X'     ; AL=表示する文字(X=非対応の印)
+    int 0x10        ; BIOS呼び出し→'X'が画面に出る
     jmp NotSupport
 
 skip_ext:
@@ -107,15 +107,15 @@ LoadKernel:
                                     ; なので、その続きのLBA6からがkernel.bin。
     mov dword[si+0xc],0            ; LBAの上位32bit(未使用)
 
-    mov dl,[DriveId]
-    mov ah,0x42
-    int 0x13
+    mov dl,[DriveId]  ; ドライブ番号を復元
+    mov ah,0x42        ; AH=0x42: 拡張INT13、DAPを使ったディスク読み込み
+    int 0x13             ; BIOS呼び出し→[si]のDAPの通りに読み込まれる
     jc  ReadError   ; 読み込み失敗ならエラー処理へ
 
     ; 進捗確認用に'S'(Success、カーネル読み込み成功)を表示。
-    mov ah, 0x0e
-    mov al, 'S'
-    int 0x10
+    mov ah, 0x0e    ; AH=0x0e: テレタイプ出力機能番号
+    mov al, 'S'     ; AL=表示する文字
+    int 0x10        ; BIOS呼び出し→'S'が画面に出る
 
     ; ========================================================================
     ; ステップ3: BIOSからメモリマップ(e820)を取得する
@@ -129,14 +129,14 @@ LoadKernel:
     ; 0x9000には「何個の領域を取得できたか」という件数を書いておく
     ; (この2つのアドレスは、後でmemory.cのinit_memory()がそのまま読む)。
 GetMemInfoStart:
-    mov eax, 0xe820
+    mov eax, 0xe820      ; EAX=0xe820: メモリマップ取得機能を指定
     mov edx, 0x534d4150 ; 'SMAP' という4文字をASCIIコードにした値。
                         ; この機能を呼ぶときの仕様上のお約束(合言葉のようなもの)。
     mov ecx, 20          ; 1回の呼び出しで受け取るバッファのサイズ(20バイト)
     mov dword[0x9000],0  ; 取得件数カウンタを0で初期化
     mov edi, 0x9008       ; 1個目の情報を書き込む先(件数カウンタの直後)
     xor ebx, ebx           ; EBX=0で呼ぶと「最初から」という意味になる
-    int 0x15
+    int 0x15                ; BIOS呼び出し→[edi]に1個目の領域情報が書き込まれる
     jc NotSupport            ; 最初の呼び出しから失敗するなら、この機能自体が
                              ; 使えないということなのでエラー処理へ
 
@@ -147,10 +147,10 @@ GeMemInfo:
     jz GetMemDone
     ; まだ続きがあるので、もう1回呼ぶ(EBXは前回の呼び出しが自動で
     ; 「次はここから」という値に更新してくれているので、そのまま使う)
-    mov eax, 0xe820
-    mov edx, 0x534d4150 ; 'SMAP'
-    mov ecx, 20
-    int 0x15
+    mov eax, 0xe820      ; 再度メモリマップ取得機能を指定
+    mov edx, 0x534d4150 ; 'SMAP'(お約束の合言葉)
+    mov ecx, 20           ; バッファサイズ
+    int 0x15               ; BIOS呼び出し→次の領域情報が[edi]に書き込まれる
     jnc GeMemInfo        ; 成功(CF=0)ならループを続ける
 
     test ebx, ebx
@@ -159,9 +159,9 @@ GeMemInfo:
 
 GetMemDone:
     ; 進捗確認用に'D'(Done、メモリマップ取得完了)を表示。
-    mov ah, 0x0e
-    mov al, 'D'
-    int 0x10
+    mov ah, 0x0e    ; AH=0x0e: テレタイプ出力機能番号
+    mov al, 'D'     ; AL=表示する文字
+    int 0x10        ; BIOS呼び出し→'D'が画面に出る
 
     ; ========================================================================
     ; ステップ4: A20ラインを有効化する
@@ -176,8 +176,8 @@ TestA20:
     ; 0xffff(=物理0xffff0)から少しずらした位置を比べる。A20が無効なら、
     ; 1MBを超えたアドレスは1MB未満の位置に「折り返して」しまうので、
     ; 全く違う場所に書いたはずの値が、同じ場所を指しているように見える。
-    mov ax,0xffff
-    mov es,ax
+    mov ax,0xffff    ; 高い方のセグメント値を用意
+    mov es,ax         ; ES=0xffff(高いアドレス側の比較に使う)
     mov word[ds:0x7c00],0xa200      ; 低いアドレス側に試しの値を書く
     cmp word[es:0x7c10],0xa200      ; 高いアドレス側(A20無効なら同じ場所に
                                     ; 見えるはずの位置)を読んで比較
@@ -205,9 +205,9 @@ SetA20LineDone:
     xor ax,ax
     mov es,ax           ; ESを元(0)に戻しておく
     ; 進捗確認用に'A'(A20、有効化完了)を表示。
-    mov ah, 0x0e
-    mov al, 'A'
-    int 0x10
+    mov ah, 0x0e    ; AH=0x0e: テレタイプ出力機能番号
+    mov al, 'A'     ; AL=表示する文字
+    int 0x10        ; BIOS呼び出し→'A'が画面に出る
 
     ; ========================================================================
     ; ステップ5: プロテクトモードへ切り替える準備
@@ -259,18 +259,18 @@ ProtectedModeStart:
     ; ではなく、GDT(後述)の何番目の記述子を使うかを表す「セレクタ番号」を
     ; 入れる。0x10はGdt32の2番目のエントリ(Data32、フラットなデータ
     ; セグメント)を指す。
-    mov ax, 0x10
-    mov ds, ax
-    mov es, ax
-    mov ss, ax
-    mov esp, 0x7c00
+    mov ax, 0x10   ; AX=セレクタ0x10(Data32、下のGdt32参照)
+    mov ds, ax      ; DS=0x10
+    mov es, ax       ; ES=0x10
+    mov ss, ax        ; SS=0x10
+    mov esp, 0x7c00    ; スタックポインタを設定し直す(セグメントの意味が変わったため)
 
     ; 進捗確認用に、画面メモリへ直接'P'(Protected mode)を書き込む。
     ; プロテクトモードに入った直後はまだBIOSのint 0x10が使えないので、
     ; VGAテキストモードのメモリ(物理0xb8000番地から、2バイトで1文字。
     ; 1バイト目=文字コード、2バイト目=色)に直接書き込んでいる。
-    mov byte [0xb8000], 'P'
-    mov byte [0xb8001], 0xa
+    mov byte [0xb8000], 'P'  ; 1文字目のバイト=文字コード'P'
+    mov byte [0xb8001], 0xa   ; 1文字目の色バイト=0xa(緑っぽい明るい色)
 
     ; --------------------------------------------------------------------
     ; ページテーブルの準備
@@ -283,11 +283,11 @@ ProtectedModeStart:
     ;
     ; まず物理0x70000番地から0x10000バイト(64KB)分を0でクリアして、
     ; ページテーブル用の作業スペースを確保する。
-    cld
-    mov edi,0x70000
-    xor eax,eax
-    mov ecx,0x10000/4
-    rep stosd
+    cld               ; DF=0(前進方向)にしておく
+    mov edi,0x70000    ; クリアする範囲の先頭アドレス
+    xor eax,eax          ; 書き込む値=0
+    mov ecx,0x10000/4      ; 4バイト単位での繰り返し回数(64KB分)
+    rep stosd                ; EDIから0x10000バイト分を0で埋める
 
     ; --- マッピング1: 恒等(identity)マッピング ---
     ; 物理0x70000番地にPML4テーブルを置き、その1番目のエントリ(PML4[0])
@@ -380,15 +380,15 @@ LongModeStart:
     ; セレクタ番号の意味が変わったとき(実際、kernel.asm側では0x10は
     ; 別の意味になる)に、割り込みからの復帰時などに不整合を起こす
     ; 可能性があるため、念のため明示的に統一しておく。
-    mov ax, 0x10
-    mov ds, ax
-    mov es, ax
-    mov ss, ax
-    mov rsp, 0x7c00
+    mov ax, 0x10   ; AX=セレクタ0x10(下のGdt64のデータセグメント)
+    mov ds, ax      ; DS=0x10
+    mov es, ax       ; ES=0x10
+    mov ss, ax        ; SS=0x10
+    mov rsp, 0x7c00    ; スタックポインタを設定し直す
 
     ; 進捗確認用に'L'(Long mode)を画面メモリへ直接書き込む。
-    mov byte [0xb8000], 'L'
-    mov byte [0xb8001], 0xa
+    mov byte [0xb8000], 'L'  ; 1文字目のバイト=文字コード'L'
+    mov byte [0xb8001], 0xa   ; 1文字目の色バイト
 
     ; --------------------------------------------------------------------
     ; カーネル本体を、本来の実行場所へコピーする
@@ -397,7 +397,7 @@ LongModeStart:
     ; カーネルが実際にリンクされている物理アドレス0x200000番地へコピー
     ; する。rep movsqは「RSIが指す場所からRDIが指す場所へ、RCX個の
     ; 8バイト単位のデータをコピーする」命令。
-    cld
+    cld                  ; DF=0(前進方向)にしておく
     mov rdi,0x200000    ; コピー先
     mov rsi,0x10000      ; コピー元
     mov rcx,(KERNEL_SECTORS*512)/8  ; コピーする量(8バイト単位の個数)。
@@ -405,13 +405,13 @@ LongModeStart:
                                     ; 同じ定数を使っているので、
                                     ; 「読み込んだ量」と「コピーする量」が
                                     ; 必ず一致する。
-    rep movsq
+    rep movsq   ; RCX個の8バイトを、RSIからRDIへコピーする
 
     ; カーネルの本来のエントリポイント(仮想アドレス、higher-half側)へ
     ; ジャンプする。ここから先はkernel.asmの世界。このloader.asmの
     ; 役目はここで終わり。
-    mov rax,0xffff800000200000
-    jmp rax
+    mov rax,0xffff800000200000  ; ジャンプ先(kernel.asmのstart、higher-half側)
+    jmp rax                      ; そこへジャンプ
 
 LEnd:
     hlt
@@ -440,12 +440,12 @@ Code32:         ; 2番目(セレクタ0x08): コードセグメント
                 ; セグメントにするための設定)
     db 0        ; ベースアドレスの最上位8bit
 Data32:         ; 3番目(セレクタ0x10): データセグメント
-    dw 0xffff
-    dw 0
-    db 0
+    dw 0xffff   ; リミットの下位16bit
+    dw 0        ; ベースアドレスの下位16bit
+    db 0        ; ベースアドレスの次の8bit
     db 0x92     ; アクセスバイト: Present, リング0, 書き込み可能なデータ
-    db 0xcf
-    db 0
+    db 0xcf     ; リミット上位4bit + フラグ(Code32と同じくフラット4GB設定)
+    db 0        ; ベースアドレスの最上位8bit
 
 Gdt32Len equ $-Gdt32   ; Gdt32全体のバイト数を自動計算
 

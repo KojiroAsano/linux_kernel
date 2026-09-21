@@ -40,10 +40,10 @@ void init_memory(void)
 {
     // loader.asmが物理0x9000番地に書き込んでおいた「取得件数」と、
     // 0x9008番地から並んでいる実際のE820構造体の配列を読み出す。
-    int32_t count = *(int32_t*)0x9000;
-    uint64_t total_mem = 0;
-    struct E820 *mem_map = (struct E820*)0x9008;
-    int free_region_count = 0;
+    int32_t count = *(int32_t*)0x9000;             // 取得できた領域の件数
+    uint64_t total_mem = 0;                          // 空きメモリの合計バイト数(表示用)
+    struct E820 *mem_map = (struct E820*)0x9008;      // E820構造体の配列本体
+    int free_region_count = 0;                          // free_mem_regionに登録した件数
 
     // free_mem_region配列は50個分しか用意していないので、万が一それを
     // 超える件数が返ってきたら、ここで検出して止める(ASSERTについては
@@ -51,14 +51,14 @@ void init_memory(void)
     ASSERT(count <= 50);
 
     // 取得できた領域を1つずつ見ていく。
-	for(int32_t i = 0; i < count; i++) {
+	for(int32_t i = 0; i < count; i++) {   // count件、1件ずつ処理する
         if(mem_map[i].type == 1) {
             // type==1は「Usable」、つまりOSが自由に使ってよい空きメモリ。
             // それ以外(予約領域など)は無視する。
-            free_mem_region[free_region_count].address = mem_map[i].address;
-            free_mem_region[free_region_count].length = mem_map[i].length;
-            total_mem += mem_map[i].length;
-            free_region_count++;
+            free_mem_region[free_region_count].address = mem_map[i].address;  // 開始アドレスを記録
+            free_mem_region[free_region_count].length = mem_map[i].length;    // 長さを記録
+            total_mem += mem_map[i].length;    // 合計に加算
+            free_region_count++;                 // 登録件数を+1
         }
         // 見つかった領域を1件ずつ画面に表示する(デバッグ・確認用)。
         printk("%x  %uKB  %u\n",mem_map[i].address,mem_map[i].length/1024,(uint64_t)mem_map[i].type);
@@ -68,9 +68,9 @@ void init_memory(void)
     // 登録していく(free_region()を呼ぶ)。ただし、カーネル自身が
     // 今まさに使っているメモリ(&endより手前)を誤って「空き」として
     // 配ってしまわないよう、&end以降の部分だけを渡すようにしている。
-    for (int i = 0; i < free_region_count; i++) {
+    for (int i = 0; i < free_region_count; i++) {   // 登録した領域を1件ずつ処理する
         uint64_t vstart = P2V(free_mem_region[i].address);  // 物理→仮想アドレスへ変換
-        uint64_t vend = vstart + free_mem_region[i].length;
+        uint64_t vend = vstart + free_mem_region[i].length;  // 領域の終わりの仮想アドレス
 
         if (vstart > (uint64_t)&end) {
             // 領域全体がカーネルより後ろにあるので、そのまま丸ごと登録できる
@@ -88,8 +88,8 @@ void init_memory(void)
     // 最後に登録できたページのアドレス+1ページ分を、扱える空きメモリの
     // 上限として覚えておく(setup_kvm()がページテーブルを組み立てる
     // 範囲の指定に使う)。
-    memory_end = (uint64_t)free_memory.next+PAGE_SIZE;
-    printk("%x\n",memory_end);
+    memory_end = (uint64_t)free_memory.next+PAGE_SIZE;   // 空きメモリの上限を記録
+    printk("%x\n",memory_end);                            // その値を表示(確認用)
 }
 
 // ============================================================================
@@ -128,7 +128,7 @@ void kfree(uint64_t v)
     // vのアドレスが指す先(今は誰にも使われていないページの中身)に、
     // struct Pageとして書き込む。つまり、この空きページの先頭8バイトを
     // 「次の空きページへのポインタ」として間借りしている。
-    struct Page *page_address = (struct Page*)v;
+    struct Page *page_address = (struct Page*)v;   // vをPage構造体として扱う
     page_address->next = free_memory.next;  // 今までの先頭を、自分のnextにする
     free_memory.next = page_address;         // 自分を新しい先頭にする
 }
@@ -139,9 +139,9 @@ void kfree(uint64_t v)
 void* kalloc(void)
 {
     // 連結リストの先頭を取り出す(空だったらNULLのまま)。
-    struct Page *page_address = free_memory.next;
+    struct Page *page_address = free_memory.next;  // 今のリストの先頭
 
-    if (page_address != NULL) {
+    if (page_address != NULL) {   // 空きページがあった場合だけ処理する
         // kfree()と同じ3つの前提条件を、念のため取り出す時にも確認する
         // (リストが壊れていないかの二重チェック)。
         ASSERT((uint64_t)page_address % PAGE_SIZE == 0);
@@ -152,7 +152,7 @@ void* kalloc(void)
         free_memory.next = page_address->next;
     }
 
-    return page_address;
+    return page_address;   // 取り出したページ(無ければNULL)を返す
 }
 
 // ============================================================================
@@ -175,19 +175,19 @@ void* kalloc(void)
 // 「遅延割り当て」と呼ぶことがある)。
 static PDPTR find_pml4t_entry(uint64_t map, uint64_t v, int alloc, uint32_t attribute)
 {
-    PDPTR *map_entry = (PDPTR*)map;
-    PDPTR pdptr = NULL;
+    PDPTR *map_entry = (PDPTR*)map;   // mapをPML4テーブル(エントリの配列)として扱う
+    PDPTR pdptr = NULL;                // 戻り値の初期値(見つからなければNULLのまま)
     unsigned int index = (v >> 39) & 0x1FF;   // bit47-39を取り出す(9bit=0-511)
 
-    if ((uint64_t)map_entry[index] & PTE_P) {
+    if ((uint64_t)map_entry[index] & PTE_P) {   // このエントリがすでに存在するか確認
         // すでにこのエントリは存在する(Presentビットが立っている)ので、
         // そこに書かれている物理アドレスを仮想アドレスに変換して返す。
         pdptr = (PDPTR)P2V(PDE_ADDR(map_entry[index]));
     }
-    else if (alloc == 1) {
+    else if (alloc == 1) {   // 存在しない、かつ「無ければ作る」指定の場合
         // まだ存在しないので、新しいページを1つ確保してPDPTテーブルとして使う。
-        pdptr = (PDPTR)kalloc();
-        if (pdptr != NULL) {
+        pdptr = (PDPTR)kalloc();      // 新しいページを1つ確保
+        if (pdptr != NULL) {           // 確保に成功したら
             memset(pdptr, 0, PAGE_SIZE);   // 中身を全部0で初期化(全エントリ「未使用」状態に)
             // PML4のこのエントリに、新しく作ったPDPTテーブルの物理アドレスと
             // フラグ(attribute、Present/Writable/Userなど)を書き込む。
@@ -195,7 +195,7 @@ static PDPTR find_pml4t_entry(uint64_t map, uint64_t v, int alloc, uint32_t attr
         }
     }
 
-    return pdptr;
+    return pdptr;   // 見つかった(または新規に作った)PDPTテーブルの仮想アドレス
 }
 
 // find_pml4t_entry()を使ってPDPTテーブルまでたどり着いた後、その中から
@@ -203,26 +203,26 @@ static PDPTR find_pml4t_entry(uint64_t map, uint64_t v, int alloc, uint32_t attr
 // そのもの)を探す。考え方はfind_pml4t_entry()と全く同じで、1階層下がっただけ。
 static PD find_pdpt_entry(uint64_t map, uint64_t v, int alloc, uint32_t attribute)
 {
-    PDPTR pdptr = NULL;
-    PD pd = NULL;
+    PDPTR pdptr = NULL;   // 1階層上(PML4)からたどり着いたPDPTテーブル
+    PD pd = NULL;          // 戻り値の初期値(見つからなければNULLのまま)
     unsigned int index = (v >> 30) & 0x1FF;   // bit38-30を取り出す(9bit=0-511)
 
-    pdptr = find_pml4t_entry(map, v, alloc, attribute);
+    pdptr = find_pml4t_entry(map, v, alloc, attribute);   // まずPDPTテーブル自体を取得
     if (pdptr == NULL)
-        return NULL;
+        return NULL;   // PML4側で失敗していたら、ここでも失敗として返す
 
-    if ((uint64_t)pdptr[index] & PTE_P) {
-        pd = (PD)P2V(PDE_ADDR(pdptr[index]));
+    if ((uint64_t)pdptr[index] & PTE_P) {   // このエントリがすでに存在するか確認
+        pd = (PD)P2V(PDE_ADDR(pdptr[index]));   // あれば物理→仮想アドレスに変換
     }
-    else if (alloc == 1) {
-        pd = (PD)kalloc();
-        if (pd != NULL) {
-            memset(pd, 0, PAGE_SIZE);
-            pdptr[index] = (PD)(V2P(pd) | attribute);
+    else if (alloc == 1) {   // 存在しない、かつ「無ければ作る」指定の場合
+        pd = (PD)kalloc();     // 新しいページを1つ確保
+        if (pd != NULL) {        // 確保に成功したら
+            memset(pd, 0, PAGE_SIZE);       // 中身を0で初期化
+            pdptr[index] = (PD)(V2P(pd) | attribute);   // PDPTのこのエントリに登録
         }
     }
 
-    return pd;
+    return pd;   // 見つかった(または新規に作った)テーブルの仮想アドレス
 }
 
 // ============================================================================
@@ -237,8 +237,8 @@ bool map_pages(uint64_t map, uint64_t v, uint64_t e, uint64_t pa, uint32_t attri
 {
     uint64_t vstart = PA_DOWN(v);   // 開始アドレスを2MB境界に切り下げる
     uint64_t vend = PA_UP(e);       // 終了アドレスを2MB境界に切り上げる
-    PD pd = NULL;
-    unsigned int index;
+    PD pd = NULL;                    // 今処理中のPDPTテーブル
+    unsigned int index;                // 今処理中のページのインデックス
 
     ASSERT(v < e);                              // 範囲がちゃんと正しい向きか
     ASSERT(pa % PAGE_SIZE == 0);                 // 物理アドレスが2MB境界に揃っているか
@@ -266,11 +266,11 @@ bool map_pages(uint64_t map, uint64_t v, uint64_t e, uint64_t pa, uint32_t attri
         // 出来上がる。
         pd[index] = (PDE)(pa | attribute | PTE_ENTRY);
 
-        vstart += PAGE_SIZE;
-        pa += PAGE_SIZE;
-    } while (vstart + PAGE_SIZE <= vend);
+        vstart += PAGE_SIZE;   // 次のページの仮想アドレスへ
+        pa += PAGE_SIZE;        // 次のページの物理アドレスへ
+    } while (vstart + PAGE_SIZE <= vend);   // vendに収まる間繰り返す
 
-    return true;
+    return true;   // 全ページのマッピングに成功した
 }
 
 // ============================================================================
@@ -281,7 +281,7 @@ void switch_vm(uint64_t map)
     // CR3レジスタに、使いたいページテーブル(PML4)の物理アドレスを
     // 設定する。この瞬間から、CPUのアドレス変換がこの新しいテーブルを
     // 基準に行われるようになる。
-    load_cr3(V2P(map));
+    load_cr3(V2P(map));   // 仮想アドレスを物理アドレスに変換してCR3へ設定(trap.asm)
 }
 
 // ============================================================================
@@ -290,17 +290,17 @@ void switch_vm(uint64_t map)
 static void setup_kvm(void)
 {
     // まず、ページテーブル自身(PML4)を置くための1ページを確保する。
-    page_map = (uint64_t)kalloc();
-    ASSERT(page_map != 0);
+    page_map = (uint64_t)kalloc();   // 新しいPML4テーブル用のページを1つ確保
+    ASSERT(page_map != 0);            // 確保に失敗していないか確認
 
-    memset((void*)page_map, 0, PAGE_SIZE);
+    memset((void*)page_map, 0, PAGE_SIZE);   // 中身を0で初期化(全エントリ「未使用」に)
     // KERNEL_BASEからmemory_end(init_memory()が見つけた空きメモリの
     // 上限)までの仮想アドレス範囲を、対応する物理アドレス(V2P(KERNEL_BASE)、
     // つまり物理0番地)から、Present・Writableの権限でマッピングする。
     // これで、loader.asmが暫定で作ったページテーブルと同じ内容を、
     // 自前できちんと組み立て直したことになる。
-    bool status = map_pages(page_map, KERNEL_BASE, memory_end, V2P(KERNEL_BASE), PTE_P|PTE_W);
-    ASSERT(status == true);
+    bool status = map_pages(page_map, KERNEL_BASE, memory_end, V2P(KERNEL_BASE), PTE_P|PTE_W);  // 実際にマッピングする
+    ASSERT(status == true);   // マッピングに成功したか確認
 }
 
 // ============================================================================

@@ -27,7 +27,7 @@ memset:
     rep stosb      ; 「ALの値をRDIが指す場所へ書き込み、RDIを+1、
                    ;  RCXを-1」を、RCXが0になるまで繰り返す
     ;rdi buffer, rsi value, rdx size
-    ret
+    ret   ; 呼び出し元へ戻る
 
 ; ============================================================================
 ; int memcmp(const void *s1, const void *s2, int size)
@@ -40,7 +40,7 @@ memset:
 ; if (memcmp(a,b,n) == 0) のように書くと、条件が丸ごと逆になる)。
 ; 現時点ではこの関数はまだどこからも呼ばれていない。
 memcmp:
-    cld
+    cld             ; DF=0(前進方向)にしておく
     xor eax, eax    ; 戻り値(EAX)をいったん0にしておく
     mov ecx, edx    ; 比較するバイト数
     repe cmpsb      ; 「RDIとRSIが指す1バイトを比較し、両方を+1、RCXを-1」を、
@@ -49,7 +49,7 @@ memcmp:
                     ; 一致し続けた場合のどちらかで止まる。
     setz al         ; 直前の比較結果がZF=1(一致)だったならAL=1、
                     ; そうでなければAL=0
-    ret
+    ret   ; 呼び出し元へ戻る(戻り値はAL/EAX)
 
 ; ============================================================================
 ; memcpy(void *dest, const void *src, int size) / memmove(同じ引数)
@@ -66,14 +66,14 @@ memmove:
     ; --- 範囲が重なっているかどうかの判定 ---
     ; src(RSI)がdest(RDI)以降にあるなら、そもそも重なっていても
     ; 前から後ろへコピーして問題ない(.copyへ)。
-    cmp rsi, rdi
-    jae .copy
+    cmp rsi, rdi   ; srcとdestを比較
+    jae .copy       ; src >= destなら、そのまま前から後ろへコピーしてOK
     ; srcの終端(RSI+size)がdestの開始より前か同じなら、
     ; 重なっていないので、同じく前から後ろへコピーして良い(.copyへ)。
-    mov r8, rsi
-    add r8, rdx
-    cmp r8, rdi
-    jbe .copy
+    mov r8, rsi     ; R8=srcの開始アドレス
+    add r8, rdx      ; R8=srcの終端アドレス(src+size)
+    cmp r8, rdi       ; srcの終端とdestを比較
+    jbe .copy          ; 重なっていなければ、前から後ろへコピーしてOK
 
 .overlap:
     ; ここに来るのは「destがsrcより後ろにあり、かつ範囲が重なっている」
@@ -81,8 +81,8 @@ memmove:
     ; 部分を、コピー中に上書きしてしまう恐れがある。そこで、
     ; あえて「後ろから前へ」コピーする向きに切り替える。
     std              ; DF=1にする(rep movsbがRDI/RSIを-1ずつ進めるようになる)
-    add rdi, rdx      ; RDI/RSIを、それぞれの範囲の「末尾」へ移動させる
-    add rsi, rdx
+    add rdi, rdx      ; RDIを範囲の「末尾の次」へ移動させる
+    add rsi, rdx       ; RSIも同様に「末尾の次」へ移動させる
     sub rdi, 1        ; std指定時は「末尾のバイト」から書き始める必要があるので、
     sub rsi, 1        ; ちょうど末尾を指すよう1バイト分戻す
 
@@ -92,4 +92,4 @@ memmove:
                     ; を、RCXが0になるまで繰り返す
     cld              ; 呼び出し元に「DFは必ず0(前進)」という一般的な前提を
                      ; 壊さず返すため、後片付けとして必ず0に戻しておく
-    ret
+    ret   ; 呼び出し元へ戻る

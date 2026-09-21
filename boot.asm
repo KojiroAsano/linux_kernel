@@ -35,9 +35,9 @@ start:
     ; kernel)の節目で1文字ずつ表示することで、「今どこまで進んだか」を
     ; 目で見て確認できるようにしている。もし途中で止まったら、最後に
     ; どの文字が表示されているかを見れば、どの段階で失敗したか分かる。
-    mov ah, 0x0e
-    mov al, 'B'     ; 'B' = Boot(このファイルまで来た、という印)
-    int 0x10
+    mov ah, 0x0e    ; AH=0x0e: INT 10hの「テレタイプ出力」機能番号を指定
+    mov al, 'B'     ; AL=表示したい文字。'B' = Boot(このファイルまで来た、という印)
+    int 0x10        ; BIOSのビデオサービスを呼び出す→AL の文字が画面に出る
 
     ; --- セグメントレジスタとスタックの初期化 ---
     ; リアルモードのメモリアドレスは「セグメント:オフセット」という2つの
@@ -68,7 +68,7 @@ start:
 ; 機能が使えるかどうかを、実際に使う前に確認しておく。
     mov ah, 0x41    ; AH=0x41: 拡張INT13対応チェック機能
     mov bx, 0x55aa  ; この値を入れて呼ぶのが仕様上の決まり
-    int 0x13
+    int 0x13        ; BIOSのディスクサービスを呼び出す
     jc disk_error   ; CF(キャリーフラグ)が立っていたら「非対応」→エラー処理へ
     cmp bx, 0xaa55  ; 対応していればBXが0xaa55に書き換わって返ってくる
     jne disk_error  ; 違う値なら何かおかしいのでエラー処理へ
@@ -96,7 +96,7 @@ start:
 
     mov dl, [DriveId]  ; さっき保存しておいたドライブ番号を復元
     mov ah, 0x42       ; AH=0x42: 拡張INT13、DAPを使ったディスク読み込み
-    int 0x13
+    int 0x13           ; BIOSのディスクサービスを呼び出す→[si]のDAPの通りに読み込まれる
     jc disk_error      ; 読み込み失敗ならエラー処理へ
 
 ; --- loaderへ ---
@@ -113,13 +113,13 @@ start:
 disk_error:
     ; BIOSのINT 10h、AH=0x13(文字列表示機能)を使ってMessageの内容を
     ; まとめて表示する。1文字ずつint 0x10を呼ぶより効率的。
-    mov ah,0x13
-    mov al,1        ; 表示モード: カーソル位置更新あり、属性は下のBXで指定
-    mov bx,0xa       ; 文字の属性(色)。0xa = 緑色っぽい明るい色
-    xor dx,dx        ; 表示開始位置(行0、列0)
-    mov bp,Message   ; 表示する文字列の先頭アドレス
-    mov cx,MessageLen  ; 表示する文字数
-    int 0x10
+    mov ah,0x13         ; AH=0x13: INT 10hの「文字列表示」機能番号を指定
+    mov al,1            ; 表示モード: カーソル位置更新あり、属性は下のBXで指定
+    mov bx,0xa           ; 文字の属性(色)。0xa = 緑色っぽい明るい色
+    xor dx,dx             ; 表示開始位置(行0、列0)
+    mov bp,Message         ; 表示する文字列の先頭アドレス
+    mov cx,MessageLen       ; 表示する文字数
+    int 0x10                ; BIOSのビデオサービスを呼び出す→Messageが画面に表示される
 
 hang:
     ; これ以上できることは無いので、CPUを停止させたままループする。
@@ -134,7 +134,7 @@ hang:
 DriveId db 0            ; BIOSから教えてもらったドライブ番号を保存する変数(1バイト)
 dap times 16 db 0        ; DAP(Disk Address Packet)用に16バイト確保。中身は
                          ; 上の「loader 読み込み」のところで書き込む。
-Message:    db "We have an error in boot process"
+Message:    db "We have an error in boot process"  ; disk_errorで表示する文字列の中身
 MessageLen: equ $-Message  ; equ $-Message は「今のアドレス - Messageのアドレス」、
                             ; つまり文字列の長さを自動計算してくれる書き方。
                             ; 文字列を書き換えても長さを手で数え直さなくて済む。

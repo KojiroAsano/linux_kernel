@@ -22,7 +22,7 @@ static void init_idt_entry(struct IdtEntry *entry, uint64_t addr, uint8_t attrib
     entry->low = (uint16_t)addr;         // アドレスの下位16bit
     entry->selector = 8;                  // ハンドラはいつもカーネルコードセグメント(8)で実行
     entry->res0 = ist;  // IST(Interrupt Stack Table)インデックス。0=切り替えなし
-    entry->attr = attribute;
+    entry->attr = attribute;              // アクセス権フラグをそのまま書き込む
     entry->mid = (uint16_t)(addr>>16);    // アドレスの次の16bit
     entry->high = (uint32_t)(addr>>32);   // アドレスの残り32bit
 }
@@ -41,35 +41,35 @@ void init_idt(void)
     // 最初から全部0クリアされていることを利用し、あえて何もしていない
     // = Presentビットが立っていない = そのベクタが発生したら
     // CPUがさらに別の例外(#GP)を起こす、という状態のままにしてある。
-    init_idt_entry(&vectors[0],(uint64_t)vector0,0x8e,0);
-    init_idt_entry(&vectors[1],(uint64_t)vector1,0x8e,0);
-    init_idt_entry(&vectors[2],(uint64_t)vector2,0x8e,0);
-    init_idt_entry(&vectors[3],(uint64_t)vector3,0x8e,0);
-    init_idt_entry(&vectors[4],(uint64_t)vector4,0x8e,0);
-    init_idt_entry(&vectors[5],(uint64_t)vector5,0x8e,0);
-    init_idt_entry(&vectors[6],(uint64_t)vector6,0x8e,0);
-    init_idt_entry(&vectors[7],(uint64_t)vector7,0x8e,0);
+    init_idt_entry(&vectors[0],(uint64_t)vector0,0x8e,0);    // #DE 0除算
+    init_idt_entry(&vectors[1],(uint64_t)vector1,0x8e,0);    // #DB デバッグ
+    init_idt_entry(&vectors[2],(uint64_t)vector2,0x8e,0);    // NMI
+    init_idt_entry(&vectors[3],(uint64_t)vector3,0x8e,0);    // #BP ブレークポイント
+    init_idt_entry(&vectors[4],(uint64_t)vector4,0x8e,0);    // #OF オーバーフロー
+    init_idt_entry(&vectors[5],(uint64_t)vector5,0x8e,0);    // #BR 範囲外アクセス
+    init_idt_entry(&vectors[6],(uint64_t)vector6,0x8e,0);    // #UD 未定義命令
+    init_idt_entry(&vectors[7],(uint64_t)vector7,0x8e,0);    // #NM デバイス使用不可
     // ベクタ8(ダブルフォルト)だけはIST1(kernel.asmのTSSで設定した専用スタック)
     // を使う。スタック自体が壊れて起きるダブルフォルトを、同じ壊れたスタックの
     // まま処理しようとして連鎖的にトリプルフォルトするのを防ぐため。
-    init_idt_entry(&vectors[8],(uint64_t)vector8,0x8e,1);
-    init_idt_entry(&vectors[10],(uint64_t)vector10,0x8e,0);
-    init_idt_entry(&vectors[11],(uint64_t)vector11,0x8e,0);
-    init_idt_entry(&vectors[12],(uint64_t)vector12,0x8e,0);
-    init_idt_entry(&vectors[13],(uint64_t)vector13,0x8e,0);
-    init_idt_entry(&vectors[14],(uint64_t)vector14,0x8e,0);
-    init_idt_entry(&vectors[16],(uint64_t)vector16,0x8e,0);
-    init_idt_entry(&vectors[17],(uint64_t)vector17,0x8e,0);
-    init_idt_entry(&vectors[18],(uint64_t)vector18,0x8e,0);
-    init_idt_entry(&vectors[19],(uint64_t)vector19,0x8e,0);
+    init_idt_entry(&vectors[8],(uint64_t)vector8,0x8e,1);    // #DF ダブルフォルト(IST1)
+    init_idt_entry(&vectors[10],(uint64_t)vector10,0x8e,0);  // #TS 不正なTSS
+    init_idt_entry(&vectors[11],(uint64_t)vector11,0x8e,0);  // #NP セグメント不在
+    init_idt_entry(&vectors[12],(uint64_t)vector12,0x8e,0);  // #SS スタックセグメント例外
+    init_idt_entry(&vectors[13],(uint64_t)vector13,0x8e,0);  // #GP 一般保護例外
+    init_idt_entry(&vectors[14],(uint64_t)vector14,0x8e,0);  // #PF ページフォルト
+    init_idt_entry(&vectors[16],(uint64_t)vector16,0x8e,0);  // #MF x87浮動小数点例外
+    init_idt_entry(&vectors[17],(uint64_t)vector17,0x8e,0);  // #AC アライメントチェック
+    init_idt_entry(&vectors[18],(uint64_t)vector18,0x8e,0);  // #MC マシンチェック
+    init_idt_entry(&vectors[19],(uint64_t)vector19,0x8e,0);  // #XM SIMD浮動小数点例外
     init_idt_entry(&vectors[32],(uint64_t)vector32,0x8e,0);  // IRQ0(タイマー)
     init_idt_entry(&vectors[39],(uint64_t)vector39,0x8e,0);  // IRQ7(スプリアス割り込み)
 
     // 組み立てたIDT(vectors配列)の場所とサイズをidt_pointerにまとめ、
     // load_idt()(trap.asm、中身はlidt命令)でCPUに登録する。
-    idt_pointer.limit = sizeof(vectors)-1;
-    idt_pointer.addr = (uint64_t)vectors;
-    load_idt(&idt_pointer);
+    idt_pointer.limit = sizeof(vectors)-1;  // IDT全体のバイト数-1
+    idt_pointer.addr = (uint64_t)vectors;   // IDTの実アドレス
+    load_idt(&idt_pointer);                  // CPUに登録する(trap.asm、lidt命令)
 }
 
 // ============================================================================
@@ -88,8 +88,8 @@ void handler(struct TrapFrame *tf)
                  // PICへ伝える(eoi)だけで、他には何もしていない。
                  // 将来スケジューラを作るときは、ここで「次に動かす
                  // プロセスへ切り替える」処理を追加することになる。
-            eoi();
-            break;
+            eoi();   // PICへ処理完了を伝える
+            break;   // このcaseを抜ける
 
         case 39: // IRQ7 = マスタPICのスプリアス(まぎれ込み)割り込み。
                  // 本物のIRQ7デバイス割り込みと区別するため、ISR
@@ -99,11 +99,11 @@ void handler(struct TrapFrame *tf)
                  // なので、あえてEOIを送らずに無視する
                  // (スプリアス割り込みにEOIを送ると、他の正常な
                  // 割り込みの処理と辻褄が合わなくなることがあるため)。
-            isr_value = read_isr();
-            if ((isr_value&(1<<7)) != 0) {
-                eoi();
+            isr_value = read_isr();       // マスタPICのISRレジスタを読む
+            if ((isr_value&(1<<7)) != 0) {  // bit7(IRQ7)が立っているか確認
+                eoi();                        // 立っていれば本物なのでEOIを送る
             }
-            break;
+            break;   // このcaseを抜ける
 
         default:
             // 上記以外の番号(想定していない例外など)が来た場合。

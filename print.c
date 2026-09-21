@@ -29,18 +29,18 @@ static int udecimal_to_string(char *buffer, int position, uint64_t digits)
 {
     char digits_map[10] = "0123456789";  // 数字→文字への変換表
     char digits_buffer[25];               // 1桁ずつ、逆順に溜めておく一時領域
-    int size = 0;
+    int size = 0;                          // 溜めた桁数
 
     do {
-        digits_buffer[size++] = digits_map[digits % 10];
-        digits /= 10;
+        digits_buffer[size++] = digits_map[digits % 10];  // 一番下の桁を文字にして溜める
+        digits /= 10;                                       // 1桁分捨てる
     } while (digits != 0);   // do-whileなので、digitsが最初から0でも
                               // 最低1回は実行される(「0」という1文字は
                               // 出力される)
 
     // 逆順に溜めたdigits_bufferを、後ろから前へなめることで正しい順番にして出力
     for (int i = size-1; i >= 0; i--) {
-        buffer[position++] = digits_buffer[i];
+        buffer[position++] = digits_buffer[i];   // 1文字ずつ本来のバッファへ書き込む
     }
 
     return size;   // 実際に書き込んだ文字数
@@ -51,9 +51,9 @@ static int udecimal_to_string(char *buffer, int position, uint64_t digits)
 // ============================================================================
 static int decimal_to_string(char *buffer, int position, int64_t digits)
 {
-    int size = 0;
+    int size = 0;   // 追加で書き込んだ文字数(符号分)
 
-    if (digits < 0) {
+    if (digits < 0) {   // 負の数かどうか確認
         digits = -digits;         // 負の数は符号を反転させてから処理
         buffer[position++] = '-';  // 先に'-'を書いておく
         size = 1;
@@ -61,7 +61,7 @@ static int decimal_to_string(char *buffer, int position, int64_t digits)
 
     // 絶対値になった数を、符号なし変換関数にそのまま任せる
     size += udecimal_to_string(buffer, position, (uint64_t)digits);
-    return size;
+    return size;   // '-'の分も含めた合計文字数
 }
 
 // ============================================================================
@@ -71,16 +71,16 @@ static int decimal_to_string(char *buffer, int position, int64_t digits)
 // (0-9はそのまま、10-15はA-Fに)変換して溜め、逆順にして出力する。
 static int hex_to_string(char *buffer, int position, uint64_t digits)
 {
-    char digits_buffer[25];
-    char digits_map[16] = "0123456789ABCDEF";
-    int size = 0;
+    char digits_buffer[25];               // 1桁ずつ、逆順に溜めておく一時領域
+    char digits_map[16] = "0123456789ABCDEF";  // 数字→文字への変換表
+    int size = 0;                           // 溜めた桁数
 
     do {
-        digits_buffer[size++] = digits_map[digits % 16];
-        digits /= 16;
-    } while (digits != 0);
+        digits_buffer[size++] = digits_map[digits % 16];  // 一番下の桁を文字にして溜める
+        digits /= 16;                                       // 1桁分捨てる
+    } while (digits != 0);   // digitsが0になるまで繰り返す
 
-    for (int i = size-1; i >= 0; i--) {
+    for (int i = size-1; i >= 0; i--) {   // 逆順に溜めた桁を、正しい順番で書き込む
         buffer[position++] = digits_buffer[i];
     }
 
@@ -94,14 +94,14 @@ static int hex_to_string(char *buffer, int position, uint64_t digits)
 // ============================================================================
 static int read_string(char *buffer, int position, const char *string)
 {
-    int index = 0;
+    int index = 0;   // 何文字コピーしたか
 
     // '\0'(文字列の終わりを表す番兵)に出会うまでコピーし続ける
     for (index = 0; string[index] != '\0'; index++) {
-        buffer[position++] = string[index];
+        buffer[position++] = string[index];   // 1文字コピー
     }
 
-    return index;
+    return index;   // コピーした文字数
 }
 
 // ============================================================================
@@ -109,44 +109,44 @@ static int read_string(char *buffer, int position, const char *string)
 // ============================================================================
 static void write_screen(const char *buffer, int size, struct ScreenBuffer *sb, char color)
 {
-    int column = sb->column;
-    int row = sb->row;
+    int column = sb->column;   // 今のカーソル位置(列)を取り出す
+    int row = sb->row;          // 今のカーソル位置(行)を取り出す
 
-    for (int i = 0; i < size; i++) {
+    for (int i = 0; i < size; i++) {   // 渡された文字列を1文字ずつ処理する
         if (row >= 25) {
             // 画面の一番下(25行目)を超えてしまう場合は、いわゆる
             // 「スクロール」をする: 2行目から25行目までの内容を
             // まるごと1行分上へずらし(memcpy)、一番下の行を
             // クリアする(memset)。それから改めてrowを1つ戻す。
-            memcpy(sb->buffer,sb->buffer+LINE_SIZE,LINE_SIZE*24);
-            memset(sb->buffer+LINE_SIZE*24,0,LINE_SIZE);
-            row--;
+            memcpy(sb->buffer,sb->buffer+LINE_SIZE,LINE_SIZE*24);   // 1行分上へずらす
+            memset(sb->buffer+LINE_SIZE*24,0,LINE_SIZE);             // 最終行をクリア
+            row--;                                                    // 行位置を1つ戻す
         }
 
         if (buffer[i] == '\n') {
             // 改行文字は画面には表示せず、カーソル位置を次の行の先頭へ動かすだけ
-            column = 0;
-            row++;
+            column = 0;   // 列を先頭に戻す
+            row++;         // 次の行へ
         }
         else {
             // 文字コードと色の2バイトを、該当する画面上の位置へ書き込む。
             // column*2+row*LINE_SIZE が「その文字が画面上の何バイト目か」
             // を表す計算(1文字2バイト、1行LINE_SIZEバイトなので)。
-            sb->buffer[column*2+row*LINE_SIZE] = buffer[i];
-            sb->buffer[column*2+row*LINE_SIZE+1] = color;
+            sb->buffer[column*2+row*LINE_SIZE] = buffer[i];   // 文字コードを書き込む
+            sb->buffer[column*2+row*LINE_SIZE+1] = color;      // 色を書き込む
 
-            column++;
+            column++;   // 次の列へ進める
 
             if (column >= 80) {   // 右端まで来たら次の行へ折り返す
-                column=0;
-                row++;
+                column=0;   // 列を先頭に戻す
+                row++;       // 次の行へ
             }
         }
     }
 
     // 今回書いた分の最終的なカーソル位置を覚えておく(次回のprintk呼び出しで続きから書けるように)
-    sb->column = column;
-    sb->row = row;
+    sb->column = column;   // 最終的な列位置を保存
+    sb->row = row;          // 最終的な行位置を保存
 }
 
 // ============================================================================
@@ -164,11 +164,11 @@ int printk(const char *format, ...)
     // カーネル内の呼び出しはどれも短い文字列しか渡していないので実害は
     // 出ていないが、本来はbuffer_sizeがsizeof(buffer)を超えないよう、
     // 各所で上限チェックを入れるべき箇所。
-    char buffer[1024];
-    int buffer_size = 0;
-    int64_t integer = 0;
-    char *string = 0;
-    va_list args;
+    char buffer[1024];        // 組み立てた文字列を溜めておく一時バッファ
+    int buffer_size = 0;       // bufferに今何バイト書き込んだか
+    int64_t integer = 0;        // %x/%u/%dの値を受け取る一時変数
+    char *string = 0;            // %sの値を受け取る一時変数
+    va_list args;                 // 可変長引数を1つずつ読み出すためのカーソル
 
     va_start(args,format);   // 可変長引数を読み取る準備
 
@@ -181,23 +181,23 @@ int printk(const char *format, ...)
             // '%'の次の1文字を見て、どの書式指定かを判定する
             switch (format[++i]) {
                 case 'x':   // 16進数
-                    integer = va_arg(args, int64_t);
-                    buffer_size += hex_to_string(buffer, buffer_size, (uint64_t)integer);
+                    integer = va_arg(args, int64_t);   // 次の引数を取り出す
+                    buffer_size += hex_to_string(buffer, buffer_size, (uint64_t)integer);  // 変換して追記
                     break;
 
                 case 'u':   // 符号なし10進数
-                    integer = va_arg(args, int64_t);
-                    buffer_size += udecimal_to_string(buffer, buffer_size, (uint64_t)integer);
+                    integer = va_arg(args, int64_t);   // 次の引数を取り出す
+                    buffer_size += udecimal_to_string(buffer, buffer_size, (uint64_t)integer);  // 変換して追記
                     break;
 
                 case 'd':   // 符号あり10進数
-                    integer = va_arg(args, int64_t);
-                    buffer_size += decimal_to_string(buffer, buffer_size, integer);
+                    integer = va_arg(args, int64_t);   // 次の引数を取り出す
+                    buffer_size += decimal_to_string(buffer, buffer_size, integer);  // 変換して追記
                     break;
 
                 case 's':   // 文字列
-                    string = va_arg(args, char*);
-                    buffer_size += read_string(buffer, buffer_size, string);
+                    string = va_arg(args, char*);   // 次の引数(文字列)を取り出す
+                    buffer_size += read_string(buffer, buffer_size, string);  // そのまま追記
                     break;
 
                 default:
@@ -211,7 +211,7 @@ int printk(const char *format, ...)
 
     // 組み立てた文字列を、色0xf(白)でまとめて画面へ出力する
     write_screen(buffer, buffer_size, &screen_buffer, 0xf);
-    va_end(args);
+    va_end(args);   // 可変長引数の読み取りを終了する
 
-    return buffer_size;
+    return buffer_size;   // 実際に出力した文字数
 }

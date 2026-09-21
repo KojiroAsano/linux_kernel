@@ -63,7 +63,7 @@ struct IdtPtr { // load_idtの引数の構造体
 struct TrapFrame {
     // --- ここから15個、trap.asmのTrap:がpushした汎用レジスタ ---
     // (push順の逆＝スタックの一番上から。r15を最後にpushしたので先頭)
-    int64_t r15;
+    int64_t r15;  // trap.asmでpushされた順(r15が最後=一番上)
     int64_t r14;
     int64_t r13;
     int64_t r12;
@@ -77,7 +77,7 @@ struct TrapFrame {
     int64_t rdx;
     int64_t rcx;
     int64_t rbx;
-    int64_t rax;
+    int64_t rax;  // trap.asmで最初にpushされた(一番下)
     // --- ここから2個、各vectorNがpushしたもの ---
     int64_t trapno;     // 割り込み/例外の番号(vectorNの中でpushした値)
     int64_t errorcode;  // エラーコード。CPUが自動で積むもの、または
@@ -96,26 +96,26 @@ struct TrapFrame {
 // --- trap.asmで定義されている、各割り込み/例外番号ごとの受け口 ---
 // (中身の詳しい説明はtrap.asm参照。ここではinit_idt()がIDTへ
 //  アドレスを登録するために、関数として宣言しているだけ)
-void vector0(void);
-void vector1(void);
-void vector2(void);
-void vector3(void);
-void vector4(void);
-void vector5(void);
-void vector6(void);
-void vector7(void);
-void vector8(void);
-void vector10(void);
-void vector11(void);
-void vector12(void);
-void vector13(void);
-void vector14(void);
-void vector16(void);
-void vector17(void);
-void vector18(void);
-void vector19(void);
-void vector32(void);
-void vector39(void);
+void vector0(void);   // #DE 0除算
+void vector1(void);   // #DB デバッグ
+void vector2(void);   // NMI
+void vector3(void);   // #BP ブレークポイント
+void vector4(void);   // #OF オーバーフロー
+void vector5(void);   // #BR 範囲外アクセス
+void vector6(void);   // #UD 未定義命令
+void vector7(void);   // #NM デバイス使用不可
+void vector8(void);   // #DF ダブルフォルト(IST1使用)
+void vector10(void);  // #TS 不正なTSS
+void vector11(void);  // #NP セグメント不在
+void vector12(void);  // #SS スタックセグメント例外
+void vector13(void);  // #GP 一般保護例外
+void vector14(void);  // #PF ページフォルト
+void vector16(void);  // #MF x87浮動小数点例外
+void vector17(void);  // #AC アライメントチェック
+void vector18(void);  // #MC マシンチェック
+void vector19(void);  // #XM SIMD浮動小数点例外
+void vector32(void);  // IRQ0 タイマー
+void vector39(void);  // IRQ7 スプリアス割り込み
 
 void init_idt(void);      // IDTを組み立ててCPUに登録する(trap.c)
 void eoi(void);            // PICへ「割り込み処理完了」を伝える(trap.asm)

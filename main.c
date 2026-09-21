@@ -21,8 +21,8 @@ extern char UserStackTop[];  // kernel.asm側のリング3デモ用スタック
 
 void KMain(void)
 {
-   char *string = "Hello and Welcome";
-   int64_t value = 0x123456789ABCD;  // 動作確認用のテスト値(printkの%x確認に使う)
+   char *string = "Hello and Welcome";  // 動作確認用のテスト文字列(printkの%s確認に使う)
+   int64_t value = 0x123456789ABCD;     // 動作確認用のテスト値(printkの%x確認に使う)
 
    // --------------------------------------------------------------------
    // 割り込み関連の初期化
@@ -43,7 +43,7 @@ void KMain(void)
    // --------------------------------------------------------------------
    // 動作確認用の表示
    // --------------------------------------------------------------------
-   printk("%s\n", string);
+   printk("%s\n", string);   // "Hello and Welcome"を表示(%sの確認)
    printk("This value is equal to %x", value);   // printkの%x(16進数表示)が
                                                   // 正しく動くかの確認表示
    // ASSERT(0);

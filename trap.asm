@@ -58,46 +58,46 @@ Trap:
     ; 値を後で正確に復元できるよう、先に全部保存しておく。
     ; この15個のpushで、trap.hのTrapFrame構造体の前半(r15～rax)と
     ; ぴったり同じ並び・同じバイト数になるように作ってある。
-    push rax
-    push rbx
-    push rcx
-    push rdx
-    push rsi
-    push rdi
-    push rbp
-    push r8
-    push r9
-    push r10
-    push r11
-    push r12
-    push r13
-    push r14
-    push r15
+    push rax   ; TrapFrame.rax を保存
+    push rbx   ; TrapFrame.rbx を保存
+    push rcx   ; TrapFrame.rcx を保存
+    push rdx   ; TrapFrame.rdx を保存
+    push rsi   ; TrapFrame.rsi を保存
+    push rdi   ; TrapFrame.rdi を保存
+    push rbp   ; TrapFrame.rbp を保存
+    push r8    ; TrapFrame.r8 を保存
+    push r9    ; TrapFrame.r9 を保存
+    push r10   ; TrapFrame.r10 を保存
+    push r11   ; TrapFrame.r11 を保存
+    push r12   ; TrapFrame.r12 を保存
+    push r13   ; TrapFrame.r13 を保存
+    push r14   ; TrapFrame.r14 を保存
+    push r15   ; TrapFrame.r15 を保存(これで15個全部積み終わり、RSPがTrapFrameの先頭を指す)
 
     ; 今のRSPは、ちょうどTrapFrame構造体の先頭(r15の位置)を指している。
     ; これをそのままC言語の関数の第1引数として渡す
     ; (x86-64のSystem V ABIでは、第1引数はRDIレジスタで渡す決まり)。
-    mov rdi,rsp
+    mov rdi,rsp    ; 第1引数(RDI)=TrapFrameの先頭アドレス
     call handler   ; trap.cのhandler(struct TrapFrame *tf) を呼ぶ
 
 TrapReturn:
     ; C言語側の処理が終わったら、さっき保存した順番と逆順にレジスタを
     ; 復元していく(スタックは後入れ先出しなので、pushと逆順にpopする)。
-    pop	r15
-    pop	r14
-    pop	r13
-    pop	r12
-    pop	r11
-    pop	r10
-    pop	r9
-    pop	r8
-    pop	rbp
-    pop	rdi
-    pop	rsi
-    pop	rdx
-    pop	rcx
-    pop	rbx
-    pop	rax
+    pop	r15   ; r15を復元
+    pop	r14   ; r14を復元
+    pop	r13   ; r13を復元
+    pop	r12   ; r12を復元
+    pop	r11   ; r11を復元
+    pop	r10   ; r10を復元
+    pop	r9    ; r9を復元
+    pop	r8    ; r8を復元
+    pop	rbp   ; rbpを復元
+    pop	rdi   ; rdiを復元
+    pop	rsi   ; rsiを復元
+    pop	rdx   ; rdxを復元
+    pop	rcx   ; rcxを復元
+    pop	rbx   ; rbxを復元
+    pop	rax   ; raxを復元(これで15個全部戻し終わり)
 
     ; 各vectorNが積んだ「エラーコード」と「ベクタ番号」の2つ(16バイト)は
     ; レジスタに戻す必要が無い値なので、popせずにスタックポインタを
@@ -124,106 +124,106 @@ TrapReturn:
 ; それ以外は自分で push 0 してから番号をpushしている。
 
 vector0:            ; #DE 0除算エラー(エラーコード無し)
-    push 0
-    push 0
-    jmp Trap
+    push 0          ; ダミーのエラーコード(0)を積む
+    push 0          ; trapno=0 を積む
+    jmp Trap        ; 共通処理へ
 
 vector1:            ; #DB デバッグ例外(エラーコード無し)
-    push 0
-    push 1
+    push 0          ; ダミーのエラーコード
+    push 1          ; trapno=1
     jmp Trap
 
 vector2:            ; NMI 割り込み不可能割り込み(エラーコード無し)
-    push 0
-    push 2
+    push 0          ; ダミーのエラーコード
+    push 2          ; trapno=2
     jmp Trap
 
 vector3:            ; #BP ブレークポイント(エラーコード無し)
-    push 0
-    push 3
+    push 0          ; ダミーのエラーコード
+    push 3          ; trapno=3
     jmp Trap
 
 vector4:            ; #OF オーバーフロー(エラーコード無し)
-    push 0
-    push 4
+    push 0          ; ダミーのエラーコード
+    push 4          ; trapno=4
     jmp Trap
 
 vector5:            ; #BR 範囲外アクセス(エラーコード無し)
-    push 0
-    push 5
+    push 0          ; ダミーのエラーコード
+    push 5          ; trapno=5
     jmp Trap
 
 vector6:            ; #UD 未定義命令(エラーコード無し)
-    push 0
-    push 6
+    push 0          ; ダミーのエラーコード
+    push 6          ; trapno=6
     jmp Trap
 
 vector7:            ; #NM デバイス使用不可(エラーコード無し)
-    push 0
-    push 7
+    push 0          ; ダミーのエラーコード
+    push 7          ; trapno=7
     jmp Trap
 
 vector8:            ; #DF ダブルフォルト(エラーコードあり、CPUが自動で
                     ; 積んでくれるのでpush 0は不要。IDT側でIST1
                     ; 〈trap.c/kernel.asmのDFStack〉を使うよう設定済み)
-    push 8
+    push 8          ; trapno=8(エラーコードはCPUが自動で積み済み)
     jmp Trap
 
 vector10:           ; #TS 不正なTSS(エラーコードあり)
-    push 10
+    push 10         ; trapno=10(エラーコードはCPUが自動で積み済み)
     jmp Trap
 
 vector11:           ; #NP セグメント不在(エラーコードあり)
-    push 11
+    push 11         ; trapno=11(エラーコードはCPUが自動で積み済み)
     jmp Trap
 
 vector12:           ; #SS スタックセグメント例外(エラーコードあり)
-    push 12
+    push 12         ; trapno=12(エラーコードはCPUが自動で積み済み)
     jmp Trap
 
 vector13:           ; #GP 一般保護例外(エラーコードあり)
                     ; 権限違反やセグメント不正など、色々な原因で発生する。
-    push 13
+    push 13         ; trapno=13(エラーコードはCPUが自動で積み済み)
     jmp Trap
 
 vector14:           ; #PF ページフォルト(エラーコードあり)
                     ; マッピングされていない、または権限不足なメモリへの
                     ; アクセス時に発生する(例: リング3から未マッピングの
                     ; アドレスに触った時)。
-    push 14
+    push 14         ; trapno=14(エラーコードはCPUが自動で積み済み)
     jmp Trap
 
 vector16:           ; #MF x87浮動小数点例外(エラーコード無し)
-    push 0
-    push 16
+    push 0          ; ダミーのエラーコード
+    push 16         ; trapno=16
     jmp Trap
 
 vector17:           ; #AC アライメントチェック(エラーコードあり)
-    push 17
+    push 17         ; trapno=17(エラーコードはCPUが自動で積み済み)
     jmp Trap
 
 vector18:           ; #MC マシンチェック(エラーコード無し)
-    push 0
-    push 18
+    push 0          ; ダミーのエラーコード
+    push 18         ; trapno=18
     jmp Trap
 
 vector19:           ; #XM SIMD浮動小数点例外(エラーコード無し)
-    push 0
-    push 19
+    push 0          ; ダミーのエラーコード
+    push 19         ; trapno=19
     jmp Trap
 
 vector32:           ; IRQ0 = タイマー割り込み(PICでベクタ32番に
                     ; 再マップ済み。kernel.asmのInitPIC参照)
-    push 0
-    push 32
+    push 0          ; ダミーのエラーコード
+    push 32         ; trapno=32
     jmp Trap
 
 vector39:           ; IRQ7 = マスタPICのスプリアス(まぎれ込み)割り込み。
                     ; ハードウェアの仕様上、本物の割り込みでなくても
                     ; たまに発生することがあるベクタ。trap.cのhandler()
                     ; 側でISRレジスタを確認し、本物かどうかを見分けている。
-    push 0
-    push 39
+    push 0          ; ダミーのエラーコード
+    push 39         ; trapno=39
     jmp Trap
 
 ; ============================================================================
@@ -235,43 +235,43 @@ vector39:           ; IRQ7 = マスタPICのスプリアス(まぎれ込み)割�
 eoi:
     mov al,0x20    ; 0x20 = EOIコマンド
     out 0x20,al    ; マスタPICのコマンドポートへ送る
-    ret
+    ret            ; 呼び出し元へ戻る
 
 ; マスタPICの「ISR(In-Service Register、現在処理中の割り込みが
 ; どれか)」を読み出す。IRQ7(スプリアス割り込み)が本物かどうかの
 ; 判定に使う。
 read_isr:
     mov al,11        ; OCW3: 0x0b = 「次の読み出しでISRを見せて」という指定
-    out 0x20,al
+    out 0x20,al       ; マスタPICのコマンドポートへ送る
     in al,0x20       ; ISRの値を読み出す
-    ret
+    ret              ; AL(戻り値)にISRの値が入ったまま戻る
 
 ; IDT(割り込み記述子テーブル)をCPUに登録する。trap.cのinit_idt()から
 ; 呼ばれる。
 load_idt:
     lidt [rdi]   ; rdi = struct IdtPtr へのポインタ(C言語の第1引数)
-    ret
+    ret          ; 呼び出し元へ戻る
 
 ; CR3レジスタ(現在使うページテーブルの物理アドレス)を書き換える。
 ; プロセスごとに別々の仮想メモリ空間を持たせるスケジューラを作る時に
 ; 使う想定(memory.cのswitch_vm()から呼ばれる)。
 load_cr3:
-    mov rax,rdi
-    mov cr3,rax
-    ret
+    mov rax,rdi   ; RAX=第1引数(新しいページテーブルの物理アドレス)
+    mov cr3,rax    ; CR3へ書き込む→ページングの基準テーブルが切り替わる
+    ret             ; 呼び出し元へ戻る
 
 ; CPUの割り込み許可フラグ(RFLAGSのIFビット)を立てる。これを呼ぶまでは、
 ; PIC/PIT/IDTをどれだけ設定していても、実際には一度も割り込みが
 ; CPUに届かない。
 enable_interrupts:
-    sti
-    ret
+    sti   ; RFLAGS.IF=1にする(割り込み許可)
+    ret   ; 呼び出し元へ戻る
 
 ; 逆に割り込みを禁止する。何か「途中で邪魔されたくない」処理を
 ; 実行する前に使う想定。
 disable_interrupts:
-    cli
-    ret
+    cli   ; RFLAGS.IF=0にする(割り込み禁止)
+    ret   ; 呼び出し元へ戻る
 
 ; ============================================================================
 ; enter_usermode — リング0からリング3へ切り替える
