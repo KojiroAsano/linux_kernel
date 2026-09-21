@@ -67,29 +67,29 @@ memmove:
     ; src(RSI)がdest(RDI)以降にあるなら、そもそも重なっていても
     ; 前から後ろへコピーして問題ない(.copyへ)。
     cmp rsi, rdi   ; srcとdestを比較
-    jae .copy       ; src >= destなら、そのまま前から後ろへコピーしてOK
+    jae .copy      ; src >= destなら、そのまま前から後ろへコピーしてOK
     ; srcの終端(RSI+size)がdestの開始より前か同じなら、
     ; 重なっていないので、同じく前から後ろへコピーして良い(.copyへ)。
-    mov r8, rsi     ; R8=srcの開始アドレス
-    add r8, rdx      ; R8=srcの終端アドレス(src+size)
-    cmp r8, rdi       ; srcの終端とdestを比較
-    jbe .copy          ; 重なっていなければ、前から後ろへコピーしてOK
+    mov r8, rsi    ; R8=srcの開始アドレス
+    add r8, rdx    ; R8=srcの終端アドレス(src+size)
+    cmp r8, rdi    ; srcの終端とdestを比較
+    jbe .copy      ; 重なっていなければ、前から後ろへコピーしてOK
 
 .overlap:
     ; ここに来るのは「destがsrcより後ろにあり、かつ範囲が重なっている」
     ; 場合。この状況で前から後ろへコピーすると、まだコピーしていない
     ; 部分を、コピー中に上書きしてしまう恐れがある。そこで、
     ; あえて「後ろから前へ」コピーする向きに切り替える。
-    std              ; DF=1にする(rep movsbがRDI/RSIを-1ずつ進めるようになる)
-    add rdi, rdx      ; RDIを範囲の「末尾の次」へ移動させる
-    add rsi, rdx       ; RSIも同様に「末尾の次」へ移動させる
-    sub rdi, 1        ; std指定時は「末尾のバイト」から書き始める必要があるので、
-    sub rsi, 1        ; ちょうど末尾を指すよう1バイト分戻す
+    std            ; DF=1にする(rep movsbがRDI/RSIを-1ずつ進めるようになる)
+    add rdi, rdx   ; RDIを範囲の「末尾の次」へ移動させる
+    add rsi, rdx   ; RSIも同様に「末尾の次」へ移動させる
+    sub rdi, 1     ; std指定時は「末尾のバイト」から書き始める必要があるので、
+    sub rsi, 1     ; ちょうど末尾を指すよう1バイト分戻す
 
 .copy:
     mov ecx, edx    ; コピーするバイト数
     rep movsb       ; 「RSIが指すバイトをRDIへコピーし、両方をDFの向きに1ずつ進める」
                     ; を、RCXが0になるまで繰り返す
-    cld              ; 呼び出し元に「DFは必ず0(前進)」という一般的な前提を
-                     ; 壊さず返すため、後片付けとして必ず0に戻しておく
+    cld             ; 呼び出し元に「DFは必ず0(前進)」という一般的な前提を
+                    ; 壊さず返すため、後片付けとして必ず0に戻しておく
     ret   ; 呼び出し元へ戻る

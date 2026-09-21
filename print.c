@@ -110,7 +110,7 @@ static int read_string(char *buffer, int position, const char *string)
 static void write_screen(const char *buffer, int size, struct ScreenBuffer *sb, char color)
 {
     int column = sb->column;   // 今のカーソル位置(列)を取り出す
-    int row = sb->row;          // 今のカーソル位置(行)を取り出す
+    int row = sb->row;         // 今のカーソル位置(行)を取り出す
 
     for (int i = 0; i < size; i++) {   // 渡された文字列を1文字ずつ処理する
         if (row >= 25) {
@@ -126,27 +126,27 @@ static void write_screen(const char *buffer, int size, struct ScreenBuffer *sb, 
         if (buffer[i] == '\n') {
             // 改行文字は画面には表示せず、カーソル位置を次の行の先頭へ動かすだけ
             column = 0;   // 列を先頭に戻す
-            row++;         // 次の行へ
+            row++;        // 次の行へ
         }
         else {
             // 文字コードと色の2バイトを、該当する画面上の位置へ書き込む。
             // column*2+row*LINE_SIZE が「その文字が画面上の何バイト目か」
             // を表す計算(1文字2バイト、1行LINE_SIZEバイトなので)。
             sb->buffer[column*2+row*LINE_SIZE] = buffer[i];   // 文字コードを書き込む
-            sb->buffer[column*2+row*LINE_SIZE+1] = color;      // 色を書き込む
+            sb->buffer[column*2+row*LINE_SIZE+1] = color;     // 色を書き込む
 
             column++;   // 次の列へ進める
 
             if (column >= 80) {   // 右端まで来たら次の行へ折り返す
                 column=0;   // 列を先頭に戻す
-                row++;       // 次の行へ
+                row++;      // 次の行へ
             }
         }
     }
 
     // 今回書いた分の最終的なカーソル位置を覚えておく(次回のprintk呼び出しで続きから書けるように)
     sb->column = column;   // 最終的な列位置を保存
-    sb->row = row;          // 最終的な行位置を保存
+    sb->row = row;         // 最終的な行位置を保存
 }
 
 // ============================================================================
@@ -164,11 +164,11 @@ int printk(const char *format, ...)
     // カーネル内の呼び出しはどれも短い文字列しか渡していないので実害は
     // 出ていないが、本来はbuffer_sizeがsizeof(buffer)を超えないよう、
     // 各所で上限チェックを入れるべき箇所。
-    char buffer[1024];        // 組み立てた文字列を溜めておく一時バッファ
-    int buffer_size = 0;       // bufferに今何バイト書き込んだか
-    int64_t integer = 0;        // %x/%u/%dの値を受け取る一時変数
-    char *string = 0;            // %sの値を受け取る一時変数
-    va_list args;                 // 可変長引数を1つずつ読み出すためのカーソル
+    char buffer[1024];    // 組み立てた文字列を溜めておく一時バッファ
+    int buffer_size = 0;  // bufferに今何バイト書き込んだか
+    int64_t integer = 0;  // %x/%u/%dの値を受け取る一時変数
+    char *string = 0;     // %sの値を受け取る一時変数
+    va_list args;         // 可変長引数を1つずつ読み出すためのカーソル
 
     va_start(args,format);   // 可変長引数を読み取る準備
 

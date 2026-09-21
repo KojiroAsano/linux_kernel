@@ -19,12 +19,12 @@ static struct IdtEntry vectors[256];
 //            専用スタックへ強制的に切り替える。
 static void init_idt_entry(struct IdtEntry *entry, uint64_t addr, uint8_t attribute, uint8_t ist)
 {
-    entry->low = (uint16_t)addr;         // アドレスの下位16bit
-    entry->selector = 8;                  // ハンドラはいつもカーネルコードセグメント(8)で実行
-    entry->res0 = ist;  // IST(Interrupt Stack Table)インデックス。0=切り替えなし
-    entry->attr = attribute;              // アクセス権フラグをそのまま書き込む
-    entry->mid = (uint16_t)(addr>>16);    // アドレスの次の16bit
-    entry->high = (uint32_t)(addr>>32);   // アドレスの残り32bit
+    entry->low = (uint16_t)addr;        // アドレスの下位16bit
+    entry->selector = 8;                // ハンドラはいつもカーネルコードセグメント(8)で実行
+    entry->res0 = ist;                  // IST(Interrupt Stack Table)インデックス。0=切り替えなし
+    entry->attr = attribute;            // アクセス権フラグをそのまま書き込む
+    entry->mid = (uint16_t)(addr>>16);  // アドレスの次の16bit
+    entry->high = (uint32_t)(addr>>32); // アドレスの残り32bit
 }
 
 // ============================================================================
@@ -99,9 +99,9 @@ void handler(struct TrapFrame *tf)
                  // なので、あえてEOIを送らずに無視する
                  // (スプリアス割り込みにEOIを送ると、他の正常な
                  // 割り込みの処理と辻褄が合わなくなることがあるため)。
-            isr_value = read_isr();       // マスタPICのISRレジスタを読む
-            if ((isr_value&(1<<7)) != 0) {  // bit7(IRQ7)が立っているか確認
-                eoi();                        // 立っていれば本物なのでEOIを送る
+            isr_value = read_isr();          // マスタPICのISRレジスタを読む
+            if ((isr_value&(1<<7)) != 0) {   // bit7(IRQ7)が立っているか確認
+                eoi();                       // 立っていれば本物なのでEOIを送る
             }
             break;   // このcaseを抜ける
 

@@ -20,12 +20,12 @@
 static void free_region(uint64_t v, uint64_t e);
 
 static struct FreeMemRegion free_mem_region[50];  // e820から拾った、使える領域の一覧
-static struct Page free_memory;      // 空きページの連結リストの「先頭」を指す番人役
-                                     // (free_memory自身はページではなく、
-                                     //  free_memory.nextが本当の先頭ページ)
-static uint64_t memory_end;           // 見つかった空きメモリの一番高いアドレス
-uint64_t page_map;                     // init_kvm()が新しく作るページテーブルの
-                                       // (仮想)アドレス
+static struct Page free_memory;                   // 空きページの連結リストの「先頭」を指す番人役
+                                                   // (free_memory自身はページではなく、
+                                                   //  free_memory.nextが本当の先頭ページ)
+static uint64_t memory_end;                       // 見つかった空きメモリの一番高いアドレス
+uint64_t page_map;                                // init_kvm()が新しく作るページテーブルの
+                                                   // (仮想)アドレス
 
 // linker script(link.lds)が用意してくれる特殊なシンボル。「カーネルの
 // 実行ファイルが、メモリ上でどこまで使っているか(の直後)」を表す。
@@ -41,9 +41,9 @@ void init_memory(void)
     // loader.asmが物理0x9000番地に書き込んでおいた「取得件数」と、
     // 0x9008番地から並んでいる実際のE820構造体の配列を読み出す。
     int32_t count = *(int32_t*)0x9000;             // 取得できた領域の件数
-    uint64_t total_mem = 0;                          // 空きメモリの合計バイト数(表示用)
-    struct E820 *mem_map = (struct E820*)0x9008;      // E820構造体の配列本体
-    int free_region_count = 0;                          // free_mem_regionに登録した件数
+    uint64_t total_mem = 0;                        // 空きメモリの合計バイト数(表示用)
+    struct E820 *mem_map = (struct E820*)0x9008;   // E820構造体の配列本体
+    int free_region_count = 0;                     // free_mem_regionに登録した件数
 
     // free_mem_region配列は50個分しか用意していないので、万が一それを
     // 超える件数が返ってきたら、ここで検出して止める(ASSERTについては
@@ -51,18 +51,18 @@ void init_memory(void)
     ASSERT(count <= 50);
 
     // 取得できた領域を1つずつ見ていく。
-	for(int32_t i = 0; i < count; i++) {   // count件、1件ずつ処理する
+    for(int32_t i = 0; i < count; i++) {   // count件、1件ずつ処理する
         if(mem_map[i].type == 1) {
             // type==1は「Usable」、つまりOSが自由に使ってよい空きメモリ。
             // それ以外(予約領域など)は無視する。
             free_mem_region[free_region_count].address = mem_map[i].address;  // 開始アドレスを記録
             free_mem_region[free_region_count].length = mem_map[i].length;    // 長さを記録
-            total_mem += mem_map[i].length;    // 合計に加算
-            free_region_count++;                 // 登録件数を+1
+            total_mem += mem_map[i].length;   // 合計に加算
+            free_region_count++;               // 登録件数を+1
         }
         // 見つかった領域を1件ずつ画面に表示する(デバッグ・確認用)。
         printk("%x  %uKB  %u\n",mem_map[i].address,mem_map[i].length/1024,(uint64_t)mem_map[i].type);
-	}
+    }
 
     // 使える領域が見つかるたびに、実際にkalloc用の連結リストへ
     // 登録していく(free_region()を呼ぶ)。ただし、カーネル自身が

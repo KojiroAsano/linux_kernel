@@ -17,9 +17,9 @@
 void error_check(char *file, uint64_t line)
 {
     printk("\n------------------------------------------\n");  // 上の区切り線
-    printk("             ERROR CHECK");                          // 見出し
-    printk("\n------------------------------------------\n");     // 下の区切り線
-    printk("Assertion Failed [%s:%u]", file, line);   // %s=ファイル名, %u=行番号
+    printk("             ERROR CHECK");                        // 見出し
+    printk("\n------------------------------------------\n");  // 下の区切り線
+    printk("Assertion Failed [%s:%u]", file, line);             // %s=ファイル名, %u=行番号
 
     while (1) { }   // ここから先には進まない。これ以上コードを実行させず、
                      // 今表示した内容を画面に残したまま停止させる。

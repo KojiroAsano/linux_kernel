@@ -7,10 +7,10 @@
 // 組み立てていく。
 // ============================================================================
 
-#include "trap.h"     // init_idt(), enable_interrupts(), enter_usermode() など
-#include "print.h"    // printk()
-#include "debug.h"     // ASSERT()
-#include "memory.h"     // init_memory()
+#include "trap.h"    // init_idt(), enable_interrupts(), enter_usermode() など
+#include "print.h"   // printk()
+#include "debug.h"   // ASSERT()
+#include "memory.h"  // init_memory()
 
 // kernel.asmのUserEntry/UserStackTopラベルを、C言語側から「配列」として
 // 参照するための宣言。実際には配列ではなく、それぞれ「その名前のラベルが
