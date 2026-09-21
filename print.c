@@ -2,8 +2,9 @@
 #include "stdarg.h"
 #include "print.h"
 #include "lib.h"
+#include "memory.h"
 
-static struct ScreenBuffer screen_buffer = {(char*)0xb8000, 0, 0};
+static struct ScreenBuffer screen_buffer = {(char*)P2V(0xb8000), 0, 0};
 
 static int udecimal_to_string(char *buffer, int position, uint64_t digits)
 {
@@ -103,11 +104,11 @@ static void write_screen(const char *buffer, int size, struct ScreenBuffer *sb, 
 
 int printk(const char *format, ...)
 {
-    char buffer[1024];  // 出力する文字列を格納するためのバッファとそのサイズ
-    int buffer_size = 0; // 出力する文字列を格納するためのバッファとそのサイズ
-    int64_t integer = 0; // 整数を格納するための変数
-    char *string = 0; // 文字列を格納するためのポインタ
-    va_list args; // 可変引数を扱うための変数
+    char buffer[1024];
+    int buffer_size = 0;
+    int64_t integer = 0;
+    char *string = 0;
+    va_list args;
 
     va_start(args,format);
 
