@@ -10,18 +10,22 @@
 // loader.asmはBIOSのINT 13hでディスクを読んでいたが、これはリアルモード
 // でしか使えない。カーネル(ロングモード)側から実行中にディスクへ
 // アクセスするには、ATAコントローラのI/Oポートへ直接読み書きする、
-// 自前のドライバが必要になる。ここではプライマリATAバスのマスタ
-// ドライブ(BIOSのDL=0x80相当、QEMU/Bochsのata0-masterに当たる。
-// 今のboot.imgと同じディスク)だけを対象にした、PIO(Programmed I/O、
-// DMAを使わない一番シンプルな方式)の最小限の実装。
+// 自前のドライバが必要になる。ここではプライマリATAバス(0x1F0-0x1F7)
+// だけを対象にした、PIO(Programmed I/O、DMAを使わない一番シンプルな
+// 方式)の最小限の実装。同じプライマリバスに、マスタ・スレーブの
+// 2台のドライブがぶら下がる想定(build.shのQEMU起動オプション参照:
+// 1台目のboot.imgがマスタ、2台目のfat.imgがスレーブ)。
 // ============================================================================
 
-// 1セクタ(512バイト)分、lbaで指定した位置からbufferへ読み込む。
-// 成功したらtrue、ドライブがエラーを返したらfalseを返す。
-bool ata_read_sector(uint64_t lba, void *buffer);
+#define ATA_DRIVE_MASTER 0   // boot.img(今の起動に使っているディスク)
+#define ATA_DRIVE_SLAVE  1   // fat.img(FATファイルシステム用の2台目)
 
-// 1セクタ(512バイト)分、bufferの内容をlbaで指定した位置へ書き込む。
+// 1セクタ(512バイト)分、driveの指定したlbaの位置からbufferへ読み込む。
 // 成功したらtrue、ドライブがエラーを返したらfalseを返す。
-bool ata_write_sector(uint64_t lba, const void *buffer);
+bool ata_read_sector(int drive, uint64_t lba, void *buffer);
+
+// 1セクタ(512バイト)分、bufferの内容をdriveの指定したlbaの位置へ書き込む。
+// 成功したらtrue、ドライブがエラーを返したらfalseを返す。
+bool ata_write_sector(int drive, uint64_t lba, const void *buffer);
 
 #endif

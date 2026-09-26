@@ -1,15 +1,23 @@
 // ============================================================================
-// ata.c — ATA PIOドライバ(プライマリバス・マスタドライブ、LBA28)
+// ata.c — ATA PIOドライバ(プライマリバス、マスタ/スレーブ両対応、LBA28)
 // ============================================================================
 // ATAコントローラは、決まった番号のI/Oポート(プライマリバスなら
-// 0x1F0〜0x1F7)へレジスタ形式で読み書きすることで操作する。
+// 0x1F0〜0x1F7)へレジスタ形式で読み書きすることで操作する。同じ
+// プライマリバスに、マスタ・スレーブの2台のドライブがぶら下がる
+// (build.shのQEMU起動オプション参照: boot.imgがマスタ、fat.imgが
+// スレーブ)。どちらを操作するかは、ドライブ/ヘッドレジスタの
+// bit4で切り替える。
+//
 // PIOモードでの1セクタ読み書きの流れは、規格上おおまかに:
-//   1. ドライブがビジー(BSY)でなくなるのを待つ
-//   2. ドライブ・LBA・セクタ数をレジスタにセットする
-//   3. コマンド(READ/WRITE)を送る
-//   4. 転送準備完了(DRQ)を待つ
-//   5. データポートから256ワード(=512バイト)読み書きする
-// という手順になっている。
+//   1. 操作したいドライブを選択する(ドライブ/ヘッドレジスタ)
+//   2. ドライブがビジー(BSY)でなくなるのを待つ
+//   3. LBA・セクタ数をレジスタにセットする
+//   4. コマンド(READ/WRITE)を送る
+//   5. 転送準備完了(DRQ)を待つ
+//   6. データポートから256ワード(=512バイト)読み書きする
+// という手順になっている。ドライブ選択(手順1)は、狙った方の
+// ドライブのBSY/DRQを正しく見るために、他の設定より先に行う
+// 必要がある。
 // ============================================================================
 
 #include "ata.h"
@@ -72,14 +80,19 @@ static bool wait_drq_or_error(void)
 }
 
 // ============================================================================
-// select_and_setup — ドライブ・LBA・セクタ数をレジスタにセットする
+// select_and_setup — ドライブを選択し、LBA・セクタ数をレジスタにセットする
 // ============================================================================
-// 0xE0は「マスタドライブを選ぶ・LBAモードを使う」という固定ビット
-// (bit5とbit7は仕様上常に1、bit6=1でLBAモード、bit4=0でマスタドライブ)。
-// そこにLBAの上位4bit(bit24-27)をORして書き込む。
-static void select_and_setup(uint64_t lba, uint8_t sector_count)
+// 0xE0は「LBAモードを使う」という固定ビット(bit5とbit7は仕様上常に1、
+// bit6=1でLBAモード)。bit4がドライブ選択(0=マスタ、1=スレーブ)で、
+// driveの値をそのままそこへ入れる。そこにLBAの上位4bit(bit24-27)を
+// ORして書き込む。ドライブ選択は、この後のBSY/DRQ確認が正しい方の
+// ドライブに対して行われるよう、他のレジスタより先に書き込む。
+static void select_and_setup(int drive, uint64_t lba, uint8_t sector_count)
 {
-    out_byte(ATA_DRIVE_HEAD, (uint8_t)(0xE0 | ((lba >> 24) & 0x0F)));
+    out_byte(ATA_DRIVE_HEAD, (uint8_t)(0xE0 | ((drive & 1) << 4) | ((lba >> 24) & 0x0F)));
+    wait_bsy_clear();   // ドライブ切り替え直後、選択した方のドライブが
+                        // 応答できる状態になるのを待つ
+
     out_byte(ATA_SECTOR_COUNT, sector_count);
     out_byte(ATA_LBA_LOW, (uint8_t)(lba & 0xFF));
     out_byte(ATA_LBA_MID, (uint8_t)((lba >> 8) & 0xFF));
@@ -89,12 +102,11 @@ static void select_and_setup(uint64_t lba, uint8_t sector_count)
 // ============================================================================
 // ata_read_sector — 1セクタ(512バイト)読み込む
 // ============================================================================
-bool ata_read_sector(uint64_t lba, void *buffer)
+bool ata_read_sector(int drive, uint64_t lba, void *buffer)
 {
     uint16_t *buf16 = (uint16_t*)buffer;
 
-    wait_bsy_clear();               // 前のコマンドが残っていないことを確認
-    select_and_setup(lba, 1);        // 1セクタ分のLBA・ドライブを指定
+    select_and_setup(drive, lba, 1);   // ドライブ選択・1セクタ分のLBAを指定
     out_byte(ATA_COMMAND, ATA_CMD_READ_SECTORS);   // 読み込みコマンドを送る
 
     wait_bsy_clear();                // コマンド受理直後、処理が終わってBSYが下がるのを待つ
@@ -113,12 +125,11 @@ bool ata_read_sector(uint64_t lba, void *buffer)
 // ============================================================================
 // ata_write_sector — 1セクタ(512バイト)書き込む
 // ============================================================================
-bool ata_write_sector(uint64_t lba, const void *buffer)
+bool ata_write_sector(int drive, uint64_t lba, const void *buffer)
 {
     const uint16_t *buf16 = (const uint16_t*)buffer;
 
-    wait_bsy_clear();
-    select_and_setup(lba, 1);
+    select_and_setup(drive, lba, 1);
     out_byte(ATA_COMMAND, ATA_CMD_WRITE_SECTORS);   // 書き込みコマンドを送る
 
     wait_bsy_clear();

@@ -36,11 +36,12 @@ gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c
 gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c lib.c              # lib.c → lib.o
 gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c keyboard.c           # keyboard.c → keyboard.o
 gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c ata.c                  # ata.c → ata.o
+gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c fat.c                   # fat.c → fat.o
 
 # --- リンク ---
 # -nostdlib: 標準ライブラリをリンクしない(存在しないので)
 # -T link.lds: メモリ配置のルールとしてlink.ldsを使う
-ld -nostdlib -T link.lds -o kernel kernel.o main.o trapa.o trap.o liba.o print.o debug.o memory.o process.o syscall.o lib.o keyboard.o ata.o
+ld -nostdlib -T link.lds -o kernel kernel.o main.o trapa.o trap.o liba.o print.o debug.o memory.o process.o syscall.o lib.o keyboard.o ata.o fat.o
 
 # objcopyで、ELF形式のヘッダ情報などを全部取り除き、実際にメモリへ
 # 並べる中身(生のバイナリ)だけを取り出す。
@@ -151,6 +152,18 @@ dd if=user3/user3.bin of=boot.img bs=512 seek=$USER3_LBA conv=notrunc status=non
 #                                     発生をログに出力する(デバッグ用。
 #                                     通常の動作には影響しない)
 #
+# 2台目の-drive(fat.img)について:
+# 1台目(boot.img)がプライマリATAバスのマスタドライブ(ata.cが今まで
+# 読み書きしていたのと同じ、0x1F0-0x1F7・ドライブ選択bit=0)になるのに
+# 対し、-driveをもう1つ追加すると、QEMUのデフォルトの割り当て順で
+# 2台目は同じプライマリバスのスレーブドライブ(同じ0x1F0-0x1F7、
+# ドライブ選択bit=1)になる。ポート番号は共有するので、ata.c側は
+# セカンダリバス用の別ポート対応を増やさずに、ドライブ選択ビットを
+# 切り替えるだけでこちらも読めるようになる予定(次のステップで対応)。
+# fat.imgはホスト側で`mkfs.vfat -F 12 fat.img`してテスト用ファイルを
+# 入れたもの(このリポジトリに同梱)。boot.img/起動の仕組みには
+# 一切手を入れていない。
+#
 # 【注意】この下のバックスラッシュ(\)による行継続の途中に、コメント行を
 # 挟んではいけない。bashは継続中の行に#が来ると、そこで論理行が終わった
 # ものとして扱ってしまい、それより後ろのオプション(-mや-no-rebootなど)が
@@ -158,6 +171,7 @@ dd if=user3/user3.bin of=boot.img bs=512 seek=$USER3_LBA conv=notrunc status=non
 # (実際に一度この形でミスをして壊しかけた)。
 qemu-system-x86_64 \
   -drive format=raw,file=boot.img \
+  -drive format=raw,file=fat.img \
   -cpu qemu64,+pdpe1gb \
   -m 512M \
   -no-reboot \
