@@ -79,9 +79,17 @@ static int read_string(char *buffer, int position, const char *string)
 // ============================================================================
 // printf — ユーザープログラムから使う、書式付き出力
 // ============================================================================
-// %x(16進数)・%u(符号なし10進数)・%d(符号あり10進数)・%s(文字列)に対応。
-// カーネル側のprintkと同じく、いったんbufferへ全部組み立ててから、
-// 最後にまとめてwriteu()(=システムコール経由でwrite_screen)へ渡す。
+// %x(16進数)・%u(符号なし10進数)・%d(符号あり10進数)・%s(文字列)・
+// %c(1文字)に対応。カーネル側のprintkと同じく、いったんbufferへ
+// 全部組み立ててから、最後にまとめてwriteu()(=システムコール経由で
+// write_screen)へ渡す。
+//
+// 【%cの引数について】呼び出し側でchar型の変数をそのまま渡しても、
+// 可変長引数では自動的にint(32bit)へ昇格される。x86-64のSystem V
+// 呼び出し規約では、可変長引数の整数はどのサイズでも8バイト分の
+// レジスタ/スタック領域に(上位ビットを含めて正しく)格納されるため、
+// 他の書式指定子と同じくva_arg(args, int64_t)で読み出しても
+// 問題なく値を取り出せる(この関数の他の書式指定子と同じ前提)。
 int printf(const char *format, ...)
 {
     char buffer[1024];
@@ -116,6 +124,11 @@ int printf(const char *format, ...)
                 case 's':
                     string = va_arg(args, char*);
                     buffer_size += read_string(buffer, buffer_size, string);
+                    break;
+
+                case 'c':
+                    integer = va_arg(args, int64_t);
+                    buffer[buffer_size++] = (char)integer;
                     break;
 
                 default:
