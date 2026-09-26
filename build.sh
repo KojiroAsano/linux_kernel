@@ -35,11 +35,12 @@ gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c
 gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c syscall.c         # syscall.c → syscall.o
 gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c lib.c              # lib.c → lib.o
 gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c keyboard.c           # keyboard.c → keyboard.o
+gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c ata.c                  # ata.c → ata.o
 
 # --- リンク ---
 # -nostdlib: 標準ライブラリをリンクしない(存在しないので)
 # -T link.lds: メモリ配置のルールとしてlink.ldsを使う
-ld -nostdlib -T link.lds -o kernel kernel.o main.o trapa.o trap.o liba.o print.o debug.o memory.o process.o syscall.o lib.o keyboard.o
+ld -nostdlib -T link.lds -o kernel kernel.o main.o trapa.o trap.o liba.o print.o debug.o memory.o process.o syscall.o lib.o keyboard.o ata.o
 
 # objcopyで、ELF形式のヘッダ情報などを全部取り除き、実際にメモリへ
 # 並べる中身(生のバイナリ)だけを取り出す。

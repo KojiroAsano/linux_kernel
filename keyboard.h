@@ -2,6 +2,7 @@
 #define _KEYBOARD_H_
 
 #include "stdint.h"
+#include "io.h"   // in_byte()(io.hの汎用I/Oポート宣言に統合。以前はここで直接宣言していた)
 
 // ============================================================================
 // struct KeyboardBuffer — キー入力を溜めておくリングバッファ
@@ -22,6 +23,5 @@ struct KeyboardBuffer {
 
 char read_key_buffer(void);     // リングバッファから1文字取り出す(syscall.cから呼ばれる)
 void keyboard_handler(void);     // IRQ1(ベクタ33)が来るたびに呼ばれる(trap.cから)
-unsigned char in_byte(uint16_t port);  // 指定ポートから1バイト読む(trap.asm)
 
 #endif
