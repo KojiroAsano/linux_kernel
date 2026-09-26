@@ -19,4 +19,10 @@ struct ScreenBuffer
 // %x(16進数)・%u(符号なし10進数)・%d(符号あり10進数)・%s(文字列)の4つ。
 int printk(const char* format, ...); // 画面に文字列を出力する関数
 
+// write_screen — bufferの先頭sizeバイトを、色colorで画面へそのまま
+// 書き出す(printkのような書式解釈はしない、生の文字列出力)。
+// syscall.cのsys_write()が、ユーザープログラムのwriteu()から渡された
+// 文字列をそのまま画面へ出すために直接呼ぶ。
+void write_screen(const char *buffer, int size, char color);
+
 #endif

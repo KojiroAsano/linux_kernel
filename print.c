@@ -105,28 +105,43 @@ static int read_string(char *buffer, int position, const char *string)
 }
 
 // ============================================================================
-// write_screen — 組み立てた文字列を、実際にVGAテキストメモリへ書き込む
+// write_screen — 渡された文字列を、実際にVGAテキストメモリへ書き込む
 // ============================================================================
-static void write_screen(const char *buffer, int size, struct ScreenBuffer *sb, char color)
+// printk()からも、syscall.cのsys_write()(ユーザープログラムがwriteu()で
+// 渡した文字列をそのまま出す)からも呼ばれる。カーソル位置は
+// screen_buffer(このファイルの先頭で定義したモジュール内static変数)
+// 1つを両方の呼び出し元で共有するので、printkで表示した続きに
+// ユーザープログラムの出力が続く、という自然な見た目になる。
+void write_screen(const char *buffer, int size, char color)
 {
+    struct ScreenBuffer *sb = &screen_buffer;
     int column = sb->column;   // 今のカーソル位置(列)を取り出す
     int row = sb->row;         // 今のカーソル位置(行)を取り出す
 
     for (int i = 0; i < size; i++) {   // 渡された文字列を1文字ずつ処理する
-        if (row >= 25) {
-            // 画面の一番下(25行目)を超えてしまう場合は、いわゆる
-            // 「スクロール」をする: 2行目から25行目までの内容を
-            // まるごと1行分上へずらし(memcpy)、一番下の行を
-            // クリアする(memset)。それから改めてrowを1つ戻す。
-            memcpy(sb->buffer,sb->buffer+LINE_SIZE,LINE_SIZE*24);   // 1行分上へずらす
-            memset(sb->buffer+LINE_SIZE*24,0,LINE_SIZE);             // 最終行をクリア
-            row--;                                                    // 行位置を1つ戻す
-        }
-
         if (buffer[i] == '\n') {
             // 改行文字は画面には表示せず、カーソル位置を次の行の先頭へ動かすだけ
             column = 0;   // 列を先頭に戻す
             row++;        // 次の行へ
+        }
+        else if (buffer[i] == '\b') {
+            // バックスペース。キーボード入力の編集(1文字消す)のために
+            // 追加した。画面の一番先頭(0行0列目)にいる時は、それより
+            // 前には戻れないので何もしない。行の先頭(column==0)で
+            // 押された場合は、1つ上の行の右端(80文字目)まで戻ってから
+            // 1文字分消す。
+            if (column == 0 && row == 0) {
+                continue;
+            }
+
+            if (column == 0) {
+                row--;
+                column = 80;
+            }
+
+            column -= 1;
+            sb->buffer[column*2+row*LINE_SIZE] = 0;    // 文字コードを消す
+            sb->buffer[column*2+row*LINE_SIZE+1] = 0;  // 色も消す
         }
         else {
             // 文字コードと色の2バイトを、該当する画面上の位置へ書き込む。
@@ -142,9 +157,21 @@ static void write_screen(const char *buffer, int size, struct ScreenBuffer *sb, 
                 row++;      // 次の行へ
             }
         }
+
+        if (row >= 25) {
+            // 画面の一番下(25行目)を超えてしまう場合は、いわゆる
+            // 「スクロール」をする: 2行目から25行目までの内容を
+            // まるごと1行分上へずらし(memcpy)、一番下の行を
+            // クリアする(memset)。それから改めてrowを1つ戻す。
+            // (1文字処理するたびに確認するので、バックスペースで
+            // 行が減った場合はここに来ない=無駄にスクロールしない)
+            memcpy(sb->buffer,sb->buffer+LINE_SIZE,LINE_SIZE*24);   // 1行分上へずらす
+            memset(sb->buffer+LINE_SIZE*24,0,LINE_SIZE);             // 最終行をクリア
+            row--;                                                    // 行位置を1つ戻す
+        }
     }
 
-    // 今回書いた分の最終的なカーソル位置を覚えておく(次回のprintk呼び出しで続きから書けるように)
+    // 今回書いた分の最終的なカーソル位置を覚えておく(次回のwrite_screen呼び出しで続きから書けるように)
     sb->column = column;   // 最終的な列位置を保存
     sb->row = row;         // 最終的な行位置を保存
 }
@@ -210,7 +237,7 @@ int printk(const char *format, ...)
     }
 
     // 組み立てた文字列を、色0xf(白)でまとめて画面へ出力する
-    write_screen(buffer, buffer_size, &screen_buffer, 0xf);
+    write_screen(buffer, buffer_size, 0xf);
     va_end(args);   // 可変長引数の読み取りを終了する
 
     return buffer_size;   // 実際に出力した文字数

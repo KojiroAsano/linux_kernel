@@ -115,7 +115,9 @@ void vector17(void);  // #AC アライメントチェック
 void vector18(void);  // #MC マシンチェック
 void vector19(void);  // #XM SIMD浮動小数点例外
 void vector32(void);  // IRQ0 タイマー
+void vector33(void);  // IRQ1 キーボード
 void vector39(void);  // IRQ7 スプリアス割り込み
+void sysint(void);     // システムコール(int 0x80、リング3から呼び出し可能)
 
 void init_idt(void);      // IDTを組み立ててCPUに登録する(trap.c)
 void eoi(void);            // PICへ「割り込み処理完了」を伝える(trap.asm)
@@ -125,5 +127,9 @@ void enable_interrupts(void);          // 割り込みを許可する。sti(trap
 void disable_interrupts(void);          // 割り込みを禁止する。cli(trap.asm)
 void enter_usermode(uint64_t entry, uint64_t stack);  // リング0からリング3へ
                                                        // 切り替える(trap.asm)
+void TrapReturn(void);   // レジスタを復元してiretqする(trap.asm)。process.cが
+                          // プロセスの初期コンテキストを組み立てる時、戻り先として使う。
+uint64_t get_ticks(void);  // タイマー割り込みが発生した回数を返す(trap.c)
+void idle_loop(void);       // 実行可能なプロセスが無い時に走る、アイドルループ(trap.asm)
 
 #endif

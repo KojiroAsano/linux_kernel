@@ -31,6 +31,25 @@
 %define KERNEL_SECTORS 100  ; build.shから-Dで渡されなかった場合のフォールバック値
 %endif
 
+; --- ビルド時に渡される、3本のユーザープログラムの読み込み開始LBA ---
+; kernel.binのセクタ数が(サイズの実測により)ビルドのたびに変わるので、
+; その直後から始まるuser1/user2/user3.binの位置も、固定値ではなく
+; build.shが「6(boot+loader分)+KERNEL_SECTORS」を起点に計算して
+; -Dで渡してくる。フォールバック値は、KERNEL_SECTORSのフォールバック
+; (100)を前提に逆算した106/116/126(参考実装の決め打ち値と同じ)。
+%ifndef USER1_LBA
+%define USER1_LBA 106
+%endif
+%ifndef USER2_LBA
+%define USER2_LBA 116
+%endif
+%ifndef USER3_LBA
+%define USER3_LBA 126
+%endif
+; 1本のユーザープログラムに割り当てるセクタ数(固定10セクタ=5120バイト)。
+; build.sh側で、実際のuserN.binがこれを超えていないか確認している。
+%define USER_SECTORS 10
+
 start:
     ; --- セグメント・スタックの初期化(boot.asmと同じ考え方) ---
     cli
@@ -116,6 +135,59 @@ LoadKernel:
     mov ah, 0x0e    ; AH=0x0e: テレタイプ出力機能番号
     mov al, 'S'     ; AL=表示する文字
     int 0x10        ; BIOS呼び出し→'S'が画面に出る
+
+    ; ========================================================================
+    ; ステップ2.5: 3本のユーザープログラムをディスクから読み込む
+    ; ========================================================================
+    ; process.c(init_process)が、これらを物理0x20000/0x30000/0x40000から
+    ; 読み込まれているものとして扱う。やり方はLoadKernelと全く同じで、
+    ; 読み込み先セグメントとLBAだけが違う。
+LoadUser1:
+    mov si,ReadPacket
+    mov word[si],0x10           ; DAPのサイズ(固定16バイト)
+    mov word[si+2],USER_SECTORS  ; 読み込むセクタ数(固定10セクタ)
+    mov word[si+4],0               ; 読み込み先オフセット
+    mov word[si+6],0x2000           ; 読み込み先セグメント→物理0x20000番地
+    mov dword[si+8],USER1_LBA        ; 読み込み開始LBA(build.sh計算値)
+    mov dword[si+0xc],0               ; LBAの上位32bit(未使用)
+
+    mov dl,[DriveId]
+    mov ah,0x42
+    int 0x13
+    jc  ReadError
+
+LoadUser2:
+    mov si,ReadPacket
+    mov word[si],0x10
+    mov word[si+2],USER_SECTORS
+    mov word[si+4],0
+    mov word[si+6],0x3000            ; 読み込み先セグメント→物理0x30000番地
+    mov dword[si+8],USER2_LBA
+    mov dword[si+0xc],0
+
+    mov dl,[DriveId]
+    mov ah,0x42
+    int 0x13
+    jc  ReadError
+
+LoadUser3:
+    mov si,ReadPacket
+    mov word[si],0x10
+    mov word[si+2],USER_SECTORS
+    mov word[si+4],0
+    mov word[si+6],0x4000            ; 読み込み先セグメント→物理0x40000番地
+    mov dword[si+8],USER3_LBA
+    mov dword[si+0xc],0
+
+    mov dl,[DriveId]
+    mov ah,0x42
+    int 0x13
+    jc  ReadError
+
+    ; 進捗確認用に'U'(User、3本のユーザープログラム読み込み成功)を表示。
+    mov ah, 0x0e
+    mov al, 'U'
+    int 0x10
 
     ; ========================================================================
     ; ステップ3: BIOSからメモリマップ(e820)を取得する

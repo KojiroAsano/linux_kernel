@@ -103,5 +103,10 @@ bool map_pages(uint64_t map, uint64_t v, uint64_t e, uint64_t pa, uint32_t attri
                                 // 順にマッピングする(ページテーブルを実際に
                                 // 組み立てる本体)
 void load_cr3(uint64_t map);    // CR3レジスタを書き換える(trap.asm、アセンブリ側の実体)
+void free_vm(uint64_t map);     // ページテーブルを解放する
+void free_pages(uint64_t map, uint64_t vstart, uint64_t vend);  // ページテーブルのマッピングを解除し、物理ページを解放する
+bool setup_uvm(uint64_t map, uint64_t start, int size);  // ユーザープロセス用のページテーブルを組み立てる
+uint64_t setup_kvm(void);  // カーネル専用のページテーブルを組み立てる
+uint64_t get_total_memory(void);  // 使用可能な物理メモリの合計をMB単位で返す
 
 #endif
